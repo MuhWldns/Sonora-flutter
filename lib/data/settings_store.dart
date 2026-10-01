@@ -1,62 +1,44 @@
-/// Penyimpanan preferensi lokal Sonora: base URL proxy dan cookie akun.
+/// Preferensi lokal Sonora: hanya base URL proxy.
 ///
-/// Cookie **tidak pernah** dikirim ke mana pun kecuali sebagai header
-/// `x-yt-cookie` pada request proxy; proxy tetap stateless. Nilai yang
-/// tersimpan selalu divalidasi/di-sanitasi saat dimuat, dan payload yang rusak
-/// diturunkan ke default aman alih-alih menggagalkan startup.
+/// Tidak ada cookie/rahasia yang disimpan. Nilai yang dimuat selalu
+/// divalidasi; payload rusak diturunkan ke default aman.
 library;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Preferensi yang dapat diamati (observable) oleh UI.
+/// Menyimpan dan mengamati base URL proxy.
 class SettingsStore extends ChangeNotifier {
-  SettingsStore._(
-    this._preferences, {
-    required String proxyBase,
-    required String? cookie,
-  }) : _proxyBase = proxyBase,
-       _cookie = cookie;
+  SettingsStore._(this._preferences, this._proxyBase);
 
   static const String _proxyBaseKey = 'sonora.proxyBase';
-  static const String _cookieKey = 'sonora.cookie';
 
-  /// Base URL default: kosong. Tanpa konfigurasi, aplikasi tidak memiliki
-  /// endpoint dan UI harus meminta pengguna mengisi alamat proxy.
-  static const String defaultProxyBase = '';
+  /// Default opsional dari build (`--dart-define=SONORA_PROXY_URL=...`).
+  static const String _environmentDefault =
+      String.fromEnvironment('SONORA_PROXY_URL');
 
   final SharedPreferences _preferences;
   String _proxyBase;
-  String? _cookie;
 
-  /// Base URL proxy aktif (tanpa slash di ujung). Bisa kosong.
+  /// Base URL proxy aktif (tanpa slash ujung). Bisa kosong.
   String get proxyBase => _proxyBase;
 
-  /// Cookie akun mentah, atau `null` bila belum diatur.
-  String? get cookie => _cookie;
+  /// `true` bila base URL sudah diisi.
+  bool get isConfigured => _proxyBase.isNotEmpty;
 
-  bool get hasProxyBase => _proxyBase.isNotEmpty;
-  bool get hasCookie => _cookie != null && _cookie!.isNotEmpty;
+  /// Memuat preferensi. Selalu berhasil; nilai korup menjadi default.
+  static Future<SettingsStore> load() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  /// Memuat preferensi dari penyimpanan. Selalu berhasil: nilai korup
-  /// dikembalikan ke default.
-  static Future<SettingsStore> load({SharedPreferences? preferences}) async {
-    final prefs = preferences ?? await SharedPreferences.getInstance();
-
-    var proxyBase = '';
-    final storedProxy = prefs.getString(_proxyBaseKey);
-    if (storedProxy != null) {
-      try {
-        proxyBase = normalizeProxyBase(storedProxy) ?? '';
-      } on ArgumentError {
-        proxyBase = '';
-      }
+    String proxyBase = '';
+    final stored = prefs.getString(_proxyBaseKey);
+    if (stored != null && stored.trim().isNotEmpty) {
+      proxyBase = _normalizeOrEmpty(stored);
+    } else if (_environmentDefault.trim().isNotEmpty) {
+      proxyBase = _normalizeOrEmpty(_environmentDefault);
     }
 
-    final storedCookie = prefs.getString(_cookieKey);
-    final cookie = _sanitizeCookie(storedCookie);
-
-    return SettingsStore._(prefs, proxyBase: proxyBase, cookie: cookie);
+    return SettingsStore._(prefs, proxyBase);
   }
 
   /// Menyimpan base URL proxy. String kosong menghapus konfigurasi.
@@ -70,34 +52,6 @@ class SettingsStore extends ChangeNotifier {
     } else {
       await _preferences.setString(_proxyBaseKey, normalized);
     }
-    notifyListeners();
-  }
-
-  /// Menyimpan cookie akun. String kosong ditolak.
-  Future<void> setCookie(String cookie) async {
-    final sanitized = _sanitizeCookie(cookie);
-    if (sanitized == null) {
-      throw ArgumentError.value(cookie, 'cookie', 'Cookie tidak boleh kosong.');
-    }
-    _cookie = sanitized;
-    await _preferences.setString(_cookieKey, sanitized);
-    notifyListeners();
-  }
-
-  /// Menghapus cookie akun dari memori dan penyimpanan.
-  Future<void> clearCookie() async {
-    if (_cookie == null) return;
-    _cookie = null;
-    await _preferences.remove(_cookieKey);
-    notifyListeners();
-  }
-
-  /// Menghapus seluruh preferensi.
-  Future<void> clear() async {
-    _proxyBase = '';
-    _cookie = null;
-    await _preferences.remove(_proxyBaseKey);
-    await _preferences.remove(_cookieKey);
     notifyListeners();
   }
 
@@ -125,6 +79,13 @@ class SettingsStore extends ChangeNotifier {
         'Skema URL proxy harus http atau https.',
       );
     }
+    if (uri.userInfo.isNotEmpty) {
+      throw ArgumentError.value(
+        raw,
+        'proxyBase',
+        'URL proxy tidak boleh memuat kredensial.',
+      );
+    }
     if (uri.hasQuery || uri.hasFragment) {
       throw ArgumentError.value(
         raw,
@@ -140,9 +101,11 @@ class SettingsStore extends ChangeNotifier {
     return uri.replace(path: path).toString();
   }
 
-  static String? _sanitizeCookie(String? raw) {
-    final trimmed = raw?.trim();
-    if (trimmed == null || trimmed.isEmpty) return null;
-    return trimmed;
+  static String _normalizeOrEmpty(String raw) {
+    try {
+      return normalizeProxyBase(raw) ?? '';
+    } on ArgumentError {
+      return '';
+    }
   }
 }
