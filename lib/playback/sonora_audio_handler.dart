@@ -21,14 +21,15 @@ import '../data/sonora_api.dart';
 /// no-op instead of racing the winner.
 ///
 /// Errors: playback failures are captured from just_audio's error stream,
-/// published to [error] for the UI, and surfaced to [playbackState] as an
-/// error state. Fire-and-forget calls swallow [PlayerInterruptedException]
-/// (expected when a newer request supersedes an in-flight one) but never let
-/// other failures escape unhandled.
+/// published to [error] for the UI, and reflected on [playbackState] (which
+/// carries no error processing state of its own). Fire-and-forget calls
+/// swallow [PlayerInterruptedException] (expected when a newer request
+/// supersedes an in-flight one) but never let other failures escape unhandled.
 class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   SonoraAudioHandler(this._api) : _player = AudioPlayer() {
     _sub = _player.sequenceStateStream.listen(_onSequenceChanged);
     _stateSub = _player.playbackEventStream.listen(_onPlaybackEvent);
+    _durationSub = _player.durationStream.listen(_onDuration);
     _positionSub = _player.positionStream.listen(_onPosition);
     _errorSub = _player.errorStream.listen(_onPlayerError);
   }
@@ -38,12 +39,14 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
 
   StreamSubscription<SequenceState>? _sub;
   StreamSubscription<PlaybackEvent>? _stateSub;
+  StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<PlayerException>? _errorSub;
   StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
   StreamSubscription<void>? _noisySub;
 
   PlaybackEvent? _lastEvent;
+  Duration? _lastDuration;
 
   final StreamController<Duration> _positionController =
       StreamController<Duration>.broadcast();
@@ -57,6 +60,11 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// Serializes queue mutations so the latest request always wins.
   Future<void> _operations = Future<void>.value();
+
+  /// Monotonic request counter. Each [playItems] call captures the next value;
+  /// any operation whose captured value no longer matches has been superseded
+  /// and must not load or start playback.
+  int _generation = 0;
 
   bool _disposed = false;
 
@@ -117,8 +125,9 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   /// item is preserved by looking it up in the filtered list. Repeated calls
   /// with an identical queue are idempotent and simply (re)start playback.
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0}) {
+    final generation = ++_generation;
     return _enqueue(() async {
-      if (_disposed) return;
+      if (_disposed || generation != _generation) return;
       final playable = items.where((item) => item.isPlayable).toList();
       if (playable.isEmpty) {
         _publishError('No playable tracks were provided.');
@@ -136,33 +145,28 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
 
       final signature = playable.map(_trackKey).toList();
       if (!listEquals(signature, _signature)) {
-        await _applyQueue(playable, signature, index);
+        final loaded = await _applyQueue(playable, signature, index);
+        if (!loaded) return;
       } else if (_player.sequenceState.currentIndex != index) {
         // Same queue, different selected item: jump without reloading streams.
         try {
           await _player.seek(Duration.zero, index: index);
         } on PlayerInterruptedException {
-          // Superseded by a newer request.
+          return;
         } on PlayerException catch (exception) {
           _publishError(_describe(exception));
+          return;
         }
       }
+      // A newer request may have arrived while loading; if so, it owns playback.
+      if (_disposed || generation != _generation) return;
       error.value = null;
       _publishPlaybackState();
-      try {
-        await _player.play();
-      } on PlayerInterruptedException {
-        // Superseded by a newer request; the newer request owns playback.
-      } on PlayerException catch (exception) {
-        _publishError(_describe(exception));
-      } catch (exception) {
-        _publishError(exception.toString());
-      }
-      _publishMediaItem();
+      _startPlayback();
     });
   }
 
-  Future<void> _applyQueue(
+  Future<bool> _applyQueue(
     List<MusicItem> playable,
     List<String> signature,
     int startIndex,
@@ -181,18 +185,38 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
         initialIndex: startIndex,
         initialPosition: Duration.zero,
       );
-      _signature = signature;
     } on PlayerInterruptedException {
-      // A newer queue replaced this one mid-load; leave state untouched.
+      // A newer queue replaced this one mid-load; do not treat as loaded.
+      return false;
     } on PlayerException catch (exception) {
       _publishError(_describe(exception));
+      return false;
     } catch (exception) {
       _publishError(exception.toString());
+      return false;
     }
-    // Broadcast the queue and current item so the notification and UI agree
-    // with the native playlist even when the sequence listener is skipped.
+    _signature = signature;
+    // Broadcast so the notification and UI agree with the native playlist.
     _publishQueue();
     _publishMediaItem();
+    return true;
+  }
+
+  /// Starts playback without awaiting its lifetime.
+  ///
+  /// [AudioPlayer.play]'s future completes only when playback later pauses,
+  /// stops, or reaches the end, so awaiting it would stall the operation chain
+  /// for an entire track. Failures are published instead of escaping.
+  void _startPlayback() {
+    if (_disposed) return;
+    unawaited(
+      _player.play().catchError((Object cause) {
+        if (cause is PlayerInterruptedException) return;
+        _publishError(
+          cause is PlayerException ? _describe(cause) : cause.toString(),
+        );
+      }),
+    );
   }
 
   /// Serializes [operation] behind any in-flight queue mutation.
@@ -228,6 +252,14 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     _publishPlaybackState();
   }
 
+  void _onDuration(Duration? duration) {
+    if (_disposed || duration == _lastDuration) return;
+    _lastDuration = duration;
+    // Republish the current item so the seek bar receives the real duration
+    // once the stream has been probed.
+    _publishMediaItem();
+  }
+
   void _onPosition(Duration position) {
     if (_disposed || _positionController.isClosed) return;
     _positionController.add(position);
@@ -242,13 +274,10 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     final event = _lastEvent;
     final state = _player.playerState;
     final message = error.value;
-    final inError =
-        message != null || state.processingState == ProcessingState.error;
+    final inError = message != null;
     playbackState.add(
       PlaybackState(
-        processingState: inError
-            ? AudioProcessingState.error
-            : _mapProcessing(state.processingState),
+        processingState: _mapProcessing(state.processingState),
         playing: state.playing,
         controls: <MediaControl>[
           MediaControl.skipToPrevious,
@@ -262,8 +291,11 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
         updatePosition: event?.updatePosition ?? _player.position,
         bufferedPosition: event?.bufferedPosition ?? Duration.zero,
         speed: _player.speed,
-        errorCode: inError ? (event?.errorCode ?? 1) : null,
-        errorMessage: inError ? (message ?? event?.errorMessage) : null,
+        // just_audio has no ProcessingState.error and its PlaybackEvent error
+        // fields are unreachable; playback failures are carried by the error
+        // notifier and reflected on the controls instead.
+        errorCode: inError ? 1 : null,
+        errorMessage: message,
         repeatMode: playbackState.value.repeatMode,
         shuffleMode: _player.shuffleModeEnabled
             ? AudioServiceShuffleMode.all
@@ -306,15 +338,22 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   MediaItem? _mediaItemFor(IndexedAudioSource? source) {
     final item = source?.tag;
     if (item is! MusicItem || item.videoId == null) return null;
+    // Prefer the URI captured when the queue was built so a later proxy change
+    // cannot rewrite the identity of an already-queued track.
+    final id = source is UriAudioSource
+        ? source.uri.toString()
+        : _api.streamUri(item.videoId!).toString();
     final thumbnail = item.thumbnail;
     return MediaItem(
-      id: _api.streamUri(item.videoId!).toString(),
+      id: id,
       title: item.title,
       artist: item.artist.isEmpty ? null : item.artist,
       artUri: (thumbnail != null && thumbnail.isNotEmpty)
           ? Uri.tryParse(thumbnail)
           : null,
-      duration: _parseDuration(item.duration),
+      // Use the real probed duration when available; the source listing often
+      // has none, and the seek bar needs a duration to render.
+      duration: _player.duration ?? _parseDuration(item.duration),
       extras: <String, dynamic>{'videoId': item.videoId},
     );
   }
@@ -322,7 +361,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   void _publishError(String message) {
     if (_disposed) return;
     error.value = message;
-    // _publishPlaybackState derives the error processing state from error.value.
+    // Re-broadcast so the error code/message and controls update.
     _publishPlaybackState();
   }
 
@@ -344,14 +383,9 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> play() async {
-    if (_disposed) return;
-    try {
-      await _player.play();
-    } on PlayerInterruptedException {
-      // A newer request superseded this play call.
-    } on PlayerException catch (exception) {
-      _publishError(_describe(exception));
-    }
+    // AudioPlayer.play()'s future completes only at pause/stop/end, so it must
+    // not be awaited; _startPlayback reports failures via the error notifier.
+    _startPlayback();
   }
 
   @override
@@ -393,7 +427,15 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> stop() async {
     if (_disposed) return;
+    // Invalidate any queued or in-flight playItems so a pending load cannot
+    // start playback after the user has stopped.
+    _generation++;
     await _player.stop();
+    // Drop the applied queue so a later proxy change is never reused with
+    // stale stream URLs; the next playItems rebuilds everything.
+    _signature = const <String>[];
+    queue.add(const <MediaItem>[]);
+    mediaItem.add(null);
     await super.stop();
   }
 
@@ -403,6 +445,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     _disposed = true;
     await _sub?.cancel();
     await _stateSub?.cancel();
+    await _durationSub?.cancel();
     await _positionSub?.cancel();
     await _errorSub?.cancel();
     await _interruptionSub?.cancel();
