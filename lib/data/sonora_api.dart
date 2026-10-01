@@ -6,7 +6,8 @@
 /// - Base path proxy dipertahankan (mis. `https://host/api` →
 ///   `https://host/api/home`).
 /// - Tidak ada cookie/rahasia: proxy MVP bersifat anonim.
-/// - Kegagalan jaringan/HTTP dilempar sebagai [SonoraApiException] yang aman.
+/// - Pesan error selalu dipetakan ke teks tetap; body/URL internal dari server
+///   atau exception transport tidak pernah diteruskan ke pemanggil.
 library;
 
 import 'dart:async';
@@ -89,7 +90,11 @@ class SonoraApi {
     return _getSections(base, '/browse', query: {'id': trimmed});
   }
 
-  /// Menguji koneksi ke [base] lewat `/healthz`. Melempar bila gagal.
+  /// Menguji koneksi ke [base] lewat `/healthz`.
+  ///
+  /// Sukses hanya bila respons `200` **dan** body JSON memuat `ok == true`.
+  /// Melempar [ArgumentError] untuk URL tidak valid dan [SonoraApiException]
+  /// untuk kegagalan lain.
   Future<void> checkConnection(String base) async {
     final normalized = SettingsStore.normalizeProxyBase(base);
     if (normalized == null) {
@@ -99,7 +104,25 @@ class SonoraApi {
     final response = await _send(uri);
     if (response.statusCode != 200) {
       throw SonoraApiException(
-        'Proxy tidak merespons dengan sehat (status ${response.statusCode}).',
+        _message(response.statusCode),
+        statusCode: response.statusCode,
+        uri: uri,
+      );
+    }
+
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(_decodeBody(response));
+    } on FormatException {
+      throw SonoraApiException(
+        'Respons kesehatan proxy tidak dapat dibaca.',
+        statusCode: response.statusCode,
+        uri: uri,
+      );
+    }
+    if (decoded is! Map || decoded['ok'] != true) {
+      throw SonoraApiException(
+        'Proxy tidak melaporkan status sehat.',
         statusCode: response.statusCode,
         uri: uri,
       );
@@ -165,11 +188,12 @@ class SonoraApi {
     final response = await _send(uri);
     if (response.statusCode != 200) {
       throw SonoraApiException(
-        _message(response.statusCode, _decodeBody(response)),
+        _message(response.statusCode),
         statusCode: response.statusCode,
         uri: uri,
       );
     }
+
     final Object? decoded;
     try {
       decoded = jsonDecode(_decodeBody(response));
@@ -180,7 +204,28 @@ class SonoraApi {
         uri: uri,
       );
     }
-    return _parseSections(decoded);
+
+    if (decoded is! Map) {
+      throw SonoraApiException(
+        'Format respons proxy tidak dikenal.',
+        statusCode: response.statusCode,
+        uri: uri,
+      );
+    }
+    final raw = decoded['sections'];
+    if (raw is! List) {
+      throw SonoraApiException(
+        'Respons proxy tidak memuat daftar bagian.',
+        statusCode: response.statusCode,
+        uri: uri,
+      );
+    }
+
+    // Toleran terhadap entri section rusak; bentuk root/sections tetap ketat.
+    return raw
+        .whereType<Map>()
+        .map((entry) => MusicSection.fromJson(_asMap(entry)))
+        .toList(growable: false);
   }
 
   Future<http.Response> _send(Uri uri) async {
@@ -193,9 +238,10 @@ class SonoraApi {
           .timeout(_timeout);
     } on TimeoutException {
       throw SonoraApiException('Koneksi ke proxy habis waktu.', uri: uri);
-    } on http.ClientException catch (error) {
+    } on http.ClientException {
+      // Pesan transport bisa memuat origin internal — jangan diteruskan.
       throw SonoraApiException(
-        'Tidak dapat menghubungi proxy: ${error.message}',
+        'Tidak dapat menghubungi proxy. Periksa jaringan dan alamat proxy.',
         uri: uri,
       );
     }
@@ -206,17 +252,6 @@ class SonoraApi {
   static String _decodeBody(http.Response response) =>
       utf8.decode(response.bodyBytes, allowMalformed: true);
 
-  /// Membaca `{ "sections": [...] }`; bentuk tak dikenal menjadi daftar kosong.
-  static List<MusicSection> _parseSections(Object? decoded) {
-    if (decoded is! Map) return const <MusicSection>[];
-    final raw = decoded['sections'];
-    if (raw is! List) return const <MusicSection>[];
-    return raw
-        .whereType<Map>()
-        .map((entry) => MusicSection.fromJson(_asMap(entry)))
-        .toList(growable: false);
-  }
-
   static Map<String, dynamic> _asMap(Map<Object?, Object?> value) {
     final out = <String, dynamic>{};
     for (final entry in value.entries) {
@@ -225,12 +260,15 @@ class SonoraApi {
     return out;
   }
 
-  String _message(int statusCode, String body) {
-    final detail = _errorDetail(body);
-    if (detail != null) return detail;
+  /// Pesan tetap per status; body server tidak pernah diteruskan.
+  static String _message(int statusCode) {
     switch (statusCode) {
       case 400:
         return 'Permintaan tidak valid.';
+      case 401:
+        return 'Akses ke proxy ditolak.';
+      case 403:
+        return 'Akses ditolak oleh proxy.';
       case 404:
         return 'Data tidak ditemukan di proxy.';
       case 502:
@@ -240,20 +278,5 @@ class SonoraApi {
       default:
         return 'Proxy mengembalikan status $statusCode.';
     }
-  }
-
-  /// Mengekstrak `error` dari body JSON proxy, bila ada.
-  static String? _errorDetail(String body) {
-    if (body.trim().isEmpty) return null;
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map) {
-        final message = decoded['error'];
-        if (message is String && message.isNotEmpty) return message;
-      }
-    } on FormatException {
-      // Body non-JSON (mis. HTML error page) — abaikan.
-    }
-    return null;
   }
 }

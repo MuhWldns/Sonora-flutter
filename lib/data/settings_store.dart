@@ -7,6 +7,19 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Kegagalan menulis preferensi ke penyimpanan.
+///
+/// Dilempar alih-alih melaporkan sukses palsu ketika `SharedPreferences`
+/// menolak/mengembalikan `false` dari operasi tulis.
+class SettingsPersistenceException implements Exception {
+  const SettingsPersistenceException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'SettingsPersistenceException: $message';
+}
+
 /// Menyimpan dan mengamati base URL proxy.
 class SettingsStore extends ChangeNotifier {
   SettingsStore._(this._preferences, this._proxyBase);
@@ -27,15 +40,22 @@ class SettingsStore extends ChangeNotifier {
   bool get isConfigured => _proxyBase.isNotEmpty;
 
   /// Memuat preferensi. Selalu berhasil; nilai korup menjadi default.
+  ///
+  /// Key yang **hilang** (null) memakai default build, sedangkan key yang
+  /// tersimpan sebagai string **kosong** tetap kosong (default tidak muncul
+  /// kembali setelah pengguna menghapus alamat).
   static Future<SettingsStore> load() async {
     final prefs = await SharedPreferences.getInstance();
 
-    String proxyBase = '';
-    final stored = prefs.getString(_proxyBaseKey);
-    if (stored != null && stored.trim().isNotEmpty) {
-      proxyBase = _normalizeOrEmpty(stored);
-    } else if (_environmentDefault.trim().isNotEmpty) {
+    final stored = prefs.get(_proxyBaseKey);
+    final String proxyBase;
+    if (stored == null) {
       proxyBase = _normalizeOrEmpty(_environmentDefault);
+    } else if (stored is String) {
+      proxyBase = _normalizeOrEmpty(stored);
+    } else {
+      // Nilai korup (bukan string) — turunkan ke default aman.
+      proxyBase = '';
     }
 
     return SettingsStore._(prefs, proxyBase);
@@ -43,15 +63,19 @@ class SettingsStore extends ChangeNotifier {
 
   /// Menyimpan base URL proxy. String kosong menghapus konfigurasi.
   ///
-  /// Melempar [ArgumentError] bila URL non-kosong tidak valid.
-  Future<void> setProxyBase(String url) async {
-    final normalized = normalizeProxyBase(url) ?? '';
-    _proxyBase = normalized;
-    if (normalized.isEmpty) {
-      await _preferences.remove(_proxyBaseKey);
-    } else {
-      await _preferences.setString(_proxyBaseKey, normalized);
+  /// Persistensi dilakukan lebih dulu; state dan notifikasi hanya berubah bila
+  /// penyimpanan benar-benar berhasil. Melempar [ArgumentError] untuk URL non-
+  /// kosong yang tidak valid, dan [SettingsPersistenceException] bila gagal
+  /// menyimpan.
+  Future<void> setProxyBase(String value) async {
+    final normalized = normalizeProxyBase(value) ?? '';
+    final saved = await _preferences.setString(_proxyBaseKey, normalized);
+    if (!saved) {
+      throw const SettingsPersistenceException(
+        'Gagal menyimpan alamat proxy. Perubahan tidak diterapkan.',
+      );
     }
+    _proxyBase = normalized;
     notifyListeners();
   }
 
@@ -59,7 +83,7 @@ class SettingsStore extends ChangeNotifier {
   ///
   /// Mengembalikan `null` untuk input kosong (berarti "tidak dikonfigurasi").
   /// Melempar [ArgumentError] bila input non-kosong bukan URL http(s) absolut
-  /// yang wajar (tanpa query/fragment). Base path dipertahankan.
+  /// yang wajar (tanpa kredensial/query/fragment). Base path dipertahankan.
   static String? normalizeProxyBase(String? raw) {
     final trimmed = raw?.trim() ?? '';
     if (trimmed.isEmpty) return null;

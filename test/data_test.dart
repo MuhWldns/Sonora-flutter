@@ -1,8 +1,8 @@
 /// Tes fokus boundary konsumen untuk lapisan data MVP.
 ///
-/// Payload memakai bentuk respons proxy yang sebenarnya (bukan fixture besar),
-/// dan semua request diuji lewat `MockClient` deterministik. Tidak ada endpoint
-/// live yang di-hardcode.
+/// Bentuk payload mengikuti respons proxy sebenarnya (bukan fixture besar) dan
+/// semua request diuji lewat `MockClient` deterministik. Tidak ada endpoint live
+/// yang di-hardcode.
 library;
 
 import 'dart:async';
@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 import 'package:sonora_flutter/data/music_models.dart';
 import 'package:sonora_flutter/data/settings_store.dart';
 import 'package:sonora_flutter/data/sonora_api.dart';
@@ -163,11 +164,16 @@ void main() {
     });
 
     test('isPlayable false tanpa videoId atau videoId kosong', () {
-      expect(MusicItem.fromJson({'type': 'album', 'title': 'A'}).isPlayable,
-          isFalse);
       expect(
-        MusicItem.fromJson({'type': 'song', 'title': 'S', 'videoId': ''})
-            .isPlayable,
+        MusicItem.fromJson({'type': 'album', 'title': 'A'}).isPlayable,
+        isFalse,
+      );
+      expect(
+        MusicItem.fromJson({
+          'type': 'song',
+          'title': 'S',
+          'videoId': '',
+        }).isPlayable,
         isFalse,
       );
     });
@@ -193,7 +199,9 @@ void main() {
   group('MusicSection.fromJson', () {
     test('membaca judul dan daftar item', () {
       final sections = _map(_feedJson)['sections'] as List;
-      final first = MusicSection.fromJson(sections.first as Map<String, dynamic>);
+      final first = MusicSection.fromJson(
+        sections.first as Map<String, dynamic>,
+      );
       expect(first.title, 'Quick picks');
       expect(first.items, hasLength(1));
       expect(first.items.single.title, 'Shape of My Heart');
@@ -219,16 +227,26 @@ void main() {
 
     test('kosong menjadi null; URL tidak valid ditolak', () {
       expect(SettingsStore.normalizeProxyBase(''), isNull);
-      expect(() => SettingsStore.normalizeProxyBase('bukan url'),
-          throwsArgumentError);
-      expect(() => SettingsStore.normalizeProxyBase('ftp://host'),
-          throwsArgumentError);
-      expect(() => SettingsStore.normalizeProxyBase('https://u:p@host'),
-          throwsArgumentError);
-      expect(() => SettingsStore.normalizeProxyBase('https://host?x=1'),
-          throwsArgumentError);
-      expect(() => SettingsStore.normalizeProxyBase('https://host#frag'),
-          throwsArgumentError);
+      expect(
+        () => SettingsStore.normalizeProxyBase('bukan url'),
+        throwsArgumentError,
+      );
+      expect(
+        () => SettingsStore.normalizeProxyBase('ftp://host'),
+        throwsArgumentError,
+      );
+      expect(
+        () => SettingsStore.normalizeProxyBase('https://u:p@host'),
+        throwsArgumentError,
+      );
+      expect(
+        () => SettingsStore.normalizeProxyBase('https://host?x=1'),
+        throwsArgumentError,
+      );
+      expect(
+        () => SettingsStore.normalizeProxyBase('https://host#frag'),
+        throwsArgumentError,
+      );
     });
 
     test('load default kosong lalu set/clear bertahan', () async {
@@ -255,13 +273,51 @@ void main() {
       reloaded.dispose();
     });
 
-    test('nilai korup di penyimpanan menjadi default', () async {
+    test('clear menyimpan string kosong, bukan menghapus key', () async {
+      final store = await _store('https://host/api');
+      await store.setProxyBase('');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('sonora.proxyBase'), isTrue);
+      expect(prefs.getString('sonora.proxyBase'), '');
+
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.proxyBase, '');
+      expect(reloaded.isConfigured, isFalse);
+      store.dispose();
+      reloaded.dispose();
+    });
+
+    test('nilai korup (bukan string) menjadi default', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{
-        'sonora.proxyBase': 'bukan-url',
+        'sonora.proxyBase': 123,
       });
       final store = await SettingsStore.load();
       expect(store.proxyBase, '');
       store.dispose();
+    });
+
+    test('kegagalan persistensi dilempar dan state tidak berubah', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      SharedPreferencesStorePlatform.instance = _FailingStore();
+
+      final store = await SettingsStore.load();
+      expect(store.proxyBase, '');
+
+      var notified = 0;
+      store.addListener(() => notified++);
+
+      await expectLater(
+        store.setProxyBase('https://host'),
+        throwsA(isA<SettingsPersistenceException>()),
+      );
+      expect(store.proxyBase, '');
+      expect(store.isConfigured, isFalse);
+      expect(notified, 0);
+
+      store.dispose();
+      // Pulihkan platform in-memory untuk tes berikutnya.
+      SharedPreferences.setMockInitialValues(<String, Object>{});
     });
   });
 
@@ -339,14 +395,31 @@ void main() {
       store.dispose();
     });
 
-    test('sections hilang/tak dikenal menjadi daftar kosong', () async {
+    test('bentuk sections rusak melempar, entri rusak ditoleransi', () async {
       final store = await _store('https://host');
-      final api = SonoraApi(
-        store,
-        client: MockClient((_) async => _jsonResponse('{"sections":"x"}')),
-      );
-      expect(await api.home(), isEmpty);
-      api.close();
+
+      Future<void> expectMalformed(String body) async {
+        final api = SonoraApi(store, client: MockClient((_) async {
+          return _jsonResponse(body);
+        }));
+        try {
+          await expectLater(api.home(), throwsA(isA<SonoraApiException>()));
+        } finally {
+          api.close();
+        }
+      }
+
+      await expectMalformed('{"sections":"x"}');
+      await expectMalformed('[]');
+
+      final tolerant = SonoraApi(store, client: MockClient((_) async {
+        return _jsonResponse('{"sections":[42, {"title":"Ok","items":[]}]}');
+      }));
+      final sections = await tolerant.home();
+      expect(sections, hasLength(1));
+      expect(sections.single.title, 'Ok');
+      tolerant.close();
+
       store.dispose();
     });
 
@@ -354,7 +427,10 @@ void main() {
       final store = await _store(null);
       final api = SonoraApi(store);
       expect(api.isConfigured, isFalse);
-      await expectLater(api.home(), throwsA(isA<SonoraConfigurationException>()));
+      await expectLater(
+        api.home(),
+        throwsA(isA<SonoraConfigurationException>()),
+      );
       api.close();
       store.dispose();
     });
@@ -379,7 +455,7 @@ void main() {
       store.dispose();
     });
 
-    test('error HTTP dipetakan aman', () async {
+    test('error HTTP dipetakan aman tanpa membocorkan body server', () async {
       final store = await _store('https://host');
 
       Future<void> capture(http.Response response) async {
@@ -392,15 +468,23 @@ void main() {
       }
 
       await expectLater(
-        capture(_jsonResponse('{"error":"missing q"}', 400)),
-        throwsA(isA<SonoraApiException>()
-            .having((e) => e.statusCode, 'statusCode', 400)
-            .having((e) => e.message, 'message', 'missing q')),
+        capture(_jsonResponse('{"error":"SECRET internal detail"}', 400)),
+        throwsA(
+          isA<SonoraApiException>()
+              .having((e) => e.statusCode, 'statusCode', 400)
+              .having(
+                (e) => e.message,
+                'message',
+                isNot(contains('SECRET')),
+              ),
+        ),
       );
       await expectLater(
         capture(_jsonResponse('<html>boom</html>', 502)),
-        throwsA(isA<SonoraApiException>()
-            .having((e) => e.statusCode, 'statusCode', 502)),
+        throwsA(
+          isA<SonoraApiException>()
+              .having((e) => e.statusCode, 'statusCode', 502),
+        ),
       );
       await expectLater(
         capture(_jsonResponse('bukan json')),
@@ -410,50 +494,74 @@ void main() {
       store.dispose();
     });
 
-    test('kegagalan jaringan menjadi SonoraApiException', () async {
+    test('kegagalan jaringan aman tanpa membocorkan origin', () async {
       final store = await _store('https://host');
       final api = SonoraApi(
         store,
         client: MockClient((_) async {
-          throw http.ClientException('connection refused');
+          throw http.ClientException('failed to connect to host:8787');
         }),
       );
       await expectLater(
         api.home(),
-        throwsA(isA<SonoraApiException>()
-            .having((e) => e.statusCode, 'statusCode', isNull)),
+        throwsA(
+          isA<SonoraApiException>()
+              .having((e) => e.statusCode, 'statusCode', isNull)
+              .having(
+                (e) => e.message,
+                'message',
+                isNot(contains('host:8787')),
+              ),
+        ),
       );
       api.close();
       store.dispose();
     });
 
-    test('checkConnection sukses dan gagal', () async {
+    test('checkConnection memerlukan JSON ok:true', () async {
       final store = await _store(null);
-      final okApi = SonoraApi(
-        store,
-        client: MockClient((request) async {
-          expect(request.url.path, '/healthz');
-          return _jsonResponse('{"ok":true}');
-        }),
-      );
-      await okApi.checkConnection('https://host:8787/');
-      okApi.close();
 
-      final badApi = SonoraApi(
+      Future<void> expectOkBody(String body, {required bool healthy}) async {
+        final api = SonoraApi(store, client: MockClient((request) async {
+          expect(request.url.path, '/healthz');
+          return _jsonResponse(body);
+        }));
+        try {
+          if (healthy) {
+            await api.checkConnection('https://host:8787/');
+          } else {
+            await expectLater(
+              api.checkConnection('https://host'),
+              throwsA(isA<SonoraApiException>()),
+            );
+          }
+        } finally {
+          api.close();
+        }
+      }
+
+      await expectOkBody('{"ok":true,"ts":1}', healthy: true);
+      await expectOkBody('<html>ok</html>', healthy: false);
+      await expectOkBody('{"ok":false}', healthy: false);
+
+      final badStatus = SonoraApi(
         store,
         client: MockClient((_) async => _jsonResponse('{"error":"down"}', 502)),
       );
       await expectLater(
-        badApi.checkConnection('https://host'),
-        throwsA(isA<SonoraApiException>()
-            .having((e) => e.statusCode, 'statusCode', 502)),
+        badStatus.checkConnection('https://host'),
+        throwsA(
+          isA<SonoraApiException>()
+              .having((e) => e.statusCode, 'statusCode', 502),
+        ),
       );
-      badApi.close();
+      badStatus.close();
 
       await expectLater(
-        okApi.checkConnection('bukan url'),
+        badStatus.checkConnection('bukan url'),
         throwsArgumentError,
       );
+
       store.dispose();
     });
 
@@ -469,4 +577,24 @@ void main() {
       store.dispose();
     });
   });
+}
+
+/// Platform penyimpanan yang selalu gagal menulis, untuk menguji jalur
+/// kegagalan persistensi.
+class _FailingStore extends SharedPreferencesStorePlatform {
+  @override
+  Future<Map<String, Object>> getAll() async => <String, Object>{};
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async =>
+      false;
+
+  @override
+  Future<bool> remove(String key) async => false;
+
+  @override
+  Future<bool> clear() async => true;
+
+  @override
+  Future<bool> clearWithPrefix(String prefix) async => true;
 }
