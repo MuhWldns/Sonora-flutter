@@ -1,5 +1,9 @@
 package com.example.sonora_flutter
 
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity()
+/**
+ * Shares a single Flutter engine with the audio_service background service so
+ * the media notification and the UI observe the same [SonoraAudioHandler].
+ */
+class MainActivity : AudioServiceActivity()
