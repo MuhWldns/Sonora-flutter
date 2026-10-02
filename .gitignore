@@ -45,6 +45,7 @@ app.*.map.json
 /android/app/release
 
 # Local implementation workspaces and private runtime configuration
+docs/
 .worktrees/
 .superpowers/
 .env
