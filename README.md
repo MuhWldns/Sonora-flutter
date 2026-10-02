@@ -33,7 +33,10 @@ Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bers
   - Aksen warna khas Amber Sonora (`#F59E0B`).
   - Mendukung tema Material 3 Terang (*Light*) dan Gelap (*Dark*) mengikuti preferensi sistem.
   - Penanganan status koneksi: belum dikonfigurasi, memuat (*loading*), kosong (*empty*), dan error jaringan yang informatif.
-
+- 💾 **Penyimpanan Lokal SQLite (3 Tabel Offline)**:
+  - `playback_history`: Riwayat pemutaran lagu lokal di perangkat dengan pembatasan otomatis 100 entri.
+  - `favorite_tracks`: Penyimpanan lagu favorit yang disukai pengguna secara offline.
+  - `search_history`: Riwayat kata kunci pencarian terakhir beserta frekuensi cari dan filter.
 ---
 
 ## 🏗️ Arsitektur
@@ -129,7 +132,7 @@ Aplikasi ini menggunakan pengujian ketat pada boundary data, model parsing, sani
 # Analisis statis linter (0 issues)
 flutter analyze
 
-# Menjalankan unit test & regression suite (25/25 passing)
+# Menjalankan unit test & regression suite (28/28 passing)
 flutter test
 ```
 
@@ -143,10 +146,10 @@ lib/
 ├── data/
 │   ├── music_models.dart   # Model MusicItem & MusicSection (toleran InnerTube JSON)
 │   ├── settings_store.dart # Pengelolaan persistensi URL proxy (SharedPreferences)
-│   └── sonora_api.dart     # Klien HTTP proxy Sonora
+│   ├── sonora_api.dart     # Klien HTTP proxy Sonora
+│   └── local_database.dart # Basis data SQLite lokal (3 tabel: history, favorites, searches)
 ├── playback/
 │   └── sonora_audio_handler.dart # AudioHandler, just_audio, native notification & background
-└── ui/
     ├── sonora_app.dart     # Root widget aplikasi Sonora
     ├── theme.dart          # Tema Amber Material 3 Sonora (Light/Dark)
     ├── app_scope.dart      # InheritedScope penyedia state & pengendali
