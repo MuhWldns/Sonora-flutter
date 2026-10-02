@@ -1,0 +1,184 @@
+{
+ "sections": [
+  {
+   "title": "",
+   "items": [
+    {
+     "type": "song",
+     "title": "Whale Call",
+     "subtitle": "3.8M plays",
+     "videoId": "zIo1kXQuVz0",
+     "thumbnail": null,
+     "artists": [],
+     "album": null,
+     "duration": "3:49"
+    },
+    {
+     "type": "song",
+     "title": "Coral Dreams",
+     "subtitle": "386K plays",
+     "videoId": "bZwLGwOwG6U",
+     "thumbnail": null,
+     "artists": [],
+     "album": null,
+     "duration": "2:52"
+    },
+    {
+     "type": "song",
+     "title": "Rainforest",
+     "subtitle": "18M plays",
+     "videoId": "Arx6UcDo0T0",
+     "thumbnail": null,
+     "artists": [],
+     "album": null,
+     "duration": "5:24"
+    }
+   ],
+   "list": true
+  },
+  {
+   "title": "Releases for you",
+   "items": [
+    {
+     "type": "album",
+     "title": "Moonlit Tales",
+     "subtitle": "Album • Kalaido",
+     "thumbnail": "https://yt3.googleusercontent.com/IMM-Zm4vPqzCwSnJWt2lggUm9eMwWtjSMgDDXrzMnRWcsbYr-08Hr1leITLYW2HjLJUOAdzRConlKsq9=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Kalaido",
+       "browseId": "UCnX3dJnTo1kf0zZuPcED_FA"
+      }
+     ],
+     "browseId": "MPREb_NR3FkEE6ZLK",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Directions",
+     "subtitle": "Album • Blue Wednesday & Shopan",
+     "thumbnail": "https://yt3.googleusercontent.com/KMA0wiSLkLnXHvpZ1qihIG727Uktxz7bFCqiVGMZ35XcrcQbePJ38IPD5fuET5wO_kP_BbZv9z0LGT01=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Blue Wednesday",
+       "browseId": "UCH5Ryy6Kqv89TFDBS6T4bNg"
+      },
+      {
+       "name": "Shopan",
+       "browseId": "UCQbhqL8y5I7gfN0zHGNP9WA"
+      }
+     ],
+     "browseId": "MPREb_kWejpP97RHs",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Origins",
+     "subtitle": "Album • less.people",
+     "thumbnail": "https://yt3.googleusercontent.com/m5aHxvOidTynzWs9siBTi4sXy2K3dG67Zl7WxnzNMV3109YSP_tZcMXrM_ygPxTaBsEyTJj5AU5LxUU=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "less.people",
+       "browseId": "UC0JamjMHHgrV5NWyytH23cA"
+      }
+     ],
+     "browseId": "MPREb_uWsx4En3sTI",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Green Valley Trail",
+     "subtitle": "Single • Ruck P",
+     "thumbnail": "https://yt3.googleusercontent.com/XHJ8jD7fEI1Ajx-myeaxpyezJ4cnYWOu4OQfvPgdTSeCOtBo24l_BhALFEJSRyPFFwYqCgI3akGaZ6o=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Ruck P",
+       "browseId": "UCdltCBFLglVYUCuyvMEk7BA"
+      }
+     ],
+     "browseId": "MPREb_uKxlSyOKWJS",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Beneath Your Waves",
+     "subtitle": "Album • Sleepy Fish",
+     "thumbnail": "https://yt3.googleusercontent.com/3AcaWn5FbFOpjh5q_0dAf8jDAQoK7NJzUCehj9AcGQV8W24G3uRscGecKk15PP7HSsNWQFJXNuBtHbiU_g=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Sleepy Fish",
+       "browseId": "UCNR1Pzl2T9biZWAbOXZPUwQ"
+      }
+     ],
+     "browseId": "MPREb_2uw65z8wMFd",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Chillhop Essentials Winter 2017",
+     "subtitle": "Album • Various Artists",
+     "thumbnail": "https://yt3.googleusercontent.com/h_xFmOgjbMk7TxRkTJn_pOAlZzZlwgr4owEeDy2ngxZKfn7GdLzI0g50RpBsFb-h49lqQLDDBctULXIF=w544-h544-l90-rj",
+     "artists": [],
+     "browseId": "MPREb_aIEs5nt342m",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Chillhop Essentials Spring 2021",
+     "subtitle": "Album • Chillhop Music",
+     "thumbnail": "https://yt3.googleusercontent.com/RFVc9nA0XDji0fGIJAjynRrxWZmXQoLhQqG7FjTk0kjbeUFAf71eAc-_zENs1WnDRRoiiBsO9Ar9QjyXDQ=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Chillhop Music",
+       "browseId": "UCAa0VfyGGR5TyXESSG-lBug"
+      }
+     ],
+     "browseId": "MPREb_jyLKj0vbOsb",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Endless Sunday Vol. 1",
+     "subtitle": "Album • Chillhop Music Raccoon",
+     "thumbnail": "https://yt3.googleusercontent.com/unM3h3LOy54UPhJWHTzE9gmV5wyleztnUCJ4UQwryMqpFnhcUi_esdCGDusrqTxCcSzKaIOdS1NSk28=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Chillhop Music Raccoon",
+       "browseId": "UC_3I-NccA3sz7Vpyb1MBBFg"
+      }
+     ],
+     "browseId": "MPREb_JVvWcYDYILs",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "reboot.exe",
+     "subtitle": "Album • albie",
+     "thumbnail": "https://yt3.googleusercontent.com/AL2so3GxIKP-6VsEuKSanNv1f3GAa2p83jcjEWROElhvniP1T47f_N8YE-gDzGXdYcR5WmUf745BbG4=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "albie",
+       "browseId": "UCqzo8wL3GjUjaJCtfAuS6hg"
+      }
+     ],
+     "browseId": "MPREb_kzdCmTeHgxR",
+     "browseType": "album"
+    },
+    {
+     "type": "album",
+     "title": "Hologramophone",
+     "subtitle": "Album • Aviino",
+     "thumbnail": "https://yt3.googleusercontent.com/ZRkXipkFgnbcmUZ7fxB4pVup8j9v5ApdPgjRZuDdSrWAv09CyazVCjMTD-nYr9zva4eLrKvsEl4dABMH=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Aviino",
+       "browseId": "UC2YUv09A5uXob6mSdnRR7_w"
+      }
+     ],
+     "browseId": "MPREb_GWPRFE1W9zD",
+     "browseType": "album"
+    }
+   ]
+  }
+ ]
+}

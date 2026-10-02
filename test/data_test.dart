@@ -192,7 +192,14 @@ void main() {
       expect(item.subtitle, 'true');
       expect(item.thumbnail, '789');
       expect(item.videoId, '111');
-      expect(item.artist, '');
+      expect(item.artist, 'true');
+
+      final noSubtitle = MusicItem.fromJson({
+        'type': 'song',
+        'title': 'X',
+        'artists': 123,
+      });
+      expect(noSubtitle.artist, '');
     });
   });
 

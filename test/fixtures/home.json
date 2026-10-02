@@ -1,0 +1,400 @@
+{
+ "sections": [
+  {
+   "title": "Quick picks",
+   "items": [
+    {
+     "type": "song",
+     "title": "Shape of My Heart",
+     "subtitle": "Backstreet Boys • 729M plays • Black & Blue",
+     "videoId": "BLhIcQMaaTI",
+     "thumbnail": "https://yt3.googleusercontent.com/6nSKYCjwCp1f1GfgYejDk9l-3_65Qgc-sVtfeDyuAk1tSqeuTSnN6h-Z4cBeshn16kP_JIRs9whqlvQt6A=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Backstreet Boys",
+       "browseId": "UCQsJi7L4_zXzYRN2X0Fw3Zg"
+      }
+     ],
+     "album": {
+      "name": "Black & Blue",
+      "browseId": "MPREb_vZuWGAa0zeb"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Risk It All",
+     "subtitle": "Bruno Mars • 403M plays • The Romantic",
+     "videoId": "BF2_ipR1OI0",
+     "thumbnail": "https://yt3.googleusercontent.com/_1ejRnxNSULMWdqN8F-gEGUVfw5kZKrwKy5xNPnSxU6Xen61q09zCR1aQn4s4L9rDOi-fGnTh3qI-LwE=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Bruno Mars",
+       "browseId": "UCZn4r7heNOPY-C43YIywnVA"
+      }
+     ],
+     "album": {
+      "name": "The Romantic",
+      "browseId": "MPREb_ThyGRhfjSbZ"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Dirantai Digelangi Rindu (feat. Maulana Ardiansyah)",
+     "subtitle": "Shinta Gisul • 631K plays • Dirantai Digelangi Rindu",
+     "videoId": "7lSwEMIADtQ",
+     "thumbnail": "https://yt3.googleusercontent.com/PX86ECRah0PDZj1q5nh4rbf_RxGQlINT3J84jPy-_pKrtN9HqfMmAOKuk-4G07VzEBz9KlkwBlFFX5c2=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Shinta Gisul",
+       "browseId": "UCT4dzs9C6o-DgUmDmRcNsIA"
+      }
+     ],
+     "album": {
+      "name": "Dirantai Digelangi Rindu",
+      "browseId": "MPREb_ZpqEkHGqUjd"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Negoro Angin",
+     "subtitle": "Kharis Sopan • 582K plays • Negoro Angin",
+     "videoId": "2KJA0Gvss_k",
+     "thumbnail": "https://yt3.googleusercontent.com/neSRFIagYC-swTs29lxCtb_O5d22gjvpzZmiD-B7wA5Ibtwx_0Q3z6SP_6aj0MoPbBCJ5UURp_qmHxiQ=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Kharis Sopan",
+       "browseId": "UCFjBcVxCmEdXnmA8Gfp5pSg"
+      }
+     ],
+     "album": {
+      "name": "Negoro Angin",
+      "browseId": "MPREb_pQVIUrlgBPk"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Helikopter Turun Ke Padang (feat. Seto Rawon Gank & Yesa Oktavia)",
+     "subtitle": "Yeni Inka • 1.3M plays • Helikopter Turun Ke Padang",
+     "videoId": "hSuIpeplZww",
+     "thumbnail": "https://yt3.googleusercontent.com/xA_C6j_nx0olCIXh9UZO63h08ww_iO8Fw2d3c_CQkSGYGaXHVa8dUKdQb3V4wG-GAL5ihOssbotyNUKDIw=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Yeni Inka",
+       "browseId": "UCyxP1IFj5sTYMV8EtpdlbRg"
+      }
+     ],
+     "album": {
+      "name": "Helikopter Turun Ke Padang",
+      "browseId": "MPREb_S803NEaOcn8"
+     }
+    },
+    {
+     "type": "song",
+     "title": "IDOL IDOL",
+     "subtitle": "Laila Ayu & Simpatik Music • 615K plays • IDOL IDOL",
+     "videoId": "Wp1bxnzLpzA",
+     "thumbnail": "https://yt3.googleusercontent.com/oklkvbbfR-1C7QCCcbkM6dqPy5hnqYoM1IlFTz8BsZnL3vYx85dgSgrNHWn9pQ0sVhAocMy93M0Nl_ci=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Laila Ayu",
+       "browseId": "UCZcRzxzEtQ0S73frDcIrLDQ"
+      },
+      {
+       "name": "Simpatik Music",
+       "browseId": "UC1kPFwEUi_QQ7wM_lIq8qLQ"
+      }
+     ],
+     "album": {
+      "name": "IDOL IDOL",
+      "browseId": "MPREb_V8S1wjqWn6u"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Terbelah Jadi Dua (Cover)",
+     "subtitle": "Ade Govinda & Andiannsyah • 400K plays • Terbelah Jadi Dua (Cover)",
+     "videoId": "3NpDjAmj0lA",
+     "thumbnail": "https://yt3.googleusercontent.com/rDy5CPDJq57O93zAP30gHM8kldjh0D9PrL8dVXXkvA1dX6SNPBRl1PmDSWZR0jd8O5Qa2dmntklYY5gmgg=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Ade Govinda",
+       "browseId": "UC2Fo-iidAyQDzwMu4KYEJfQ"
+      }
+     ],
+     "album": {
+      "name": "Terbelah Jadi Dua (Cover)",
+      "browseId": "MPREb_qOuk7HXZwke"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Sedikit Lebih Lama",
+     "subtitle": "Piche Kota • 3.3M plays • Sedikit Lebih Lama",
+     "videoId": "P836B7BH1-w",
+     "thumbnail": "https://yt3.googleusercontent.com/r7spEfMOuDvA6bPE7RtsgGjxajWbQpApdQRMIxcyiy-1PSC-7J_52J-VWli6GVhoRIxhUYAxXw3NpmEr=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Piche Kota",
+       "browseId": "UCx8r4c5ZB_CpbYHTBLaNemw"
+      }
+     ],
+     "album": {
+      "name": "Sedikit Lebih Lama",
+      "browseId": "MPREb_rX2IXLsPKoF"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Never Change",
+     "subtitle": "nathaniel rivan • 301K plays • Never Change",
+     "videoId": "LSOQ_CVJW8U",
+     "thumbnail": "https://yt3.googleusercontent.com/ymXv4kJkA3RaskhssG7AGUsCnDX2b7_Gn82-Nq7pwtxb4Be2qf0avFiVqbu_xN3uugYBzN_45M3XTfs=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "nathaniel rivan",
+       "browseId": "UC2vVQF1y51jKQn6kdz2QDQA"
+      }
+     ],
+     "album": {
+      "name": "Never Change",
+      "browseId": "MPREb_7csDzNazipG"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Tuhan Mengapa Hidupku Menyakitkan",
+     "subtitle": "Wangsa Music • 190K plays • Tuhan Mengapa Hidupku Menyakitkan",
+     "videoId": "AqtVsQWh7xc",
+     "thumbnail": "https://yt3.googleusercontent.com/7Wy287f7Xlqzm-6npNiuS9NmwvGIKtR5riMCFwclsRnaxJXFpxJ1cctFe-Dv3ElQn-fmrHC2euflcCJz=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Wangsa Music",
+       "browseId": "UCb8Sl8lkUFIQoMi9gT8wDjA"
+      }
+     ],
+     "album": {
+      "name": "Tuhan Mengapa Hidupku Menyakitkan",
+      "browseId": "MPREb_4qQqkuvZL52"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Opo - Opo Dewe",
+     "subtitle": "Lavora • 346K plays • Opo - Opo Dewe",
+     "videoId": "UXj3pOz1Hik",
+     "thumbnail": "https://yt3.googleusercontent.com/wjHI6rWWdz8HXA-nkOIQtcQU6zMZ-OUSp2I2HpxZclYs3SYD2IPlZ2j565Qf-XF6tyeDZW1cjk9OgBGTSQ=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Lavora",
+       "browseId": "UCyEq2cX0RuWobjt6G-GOKcg"
+      }
+     ],
+     "album": {
+      "name": "Opo - Opo Dewe",
+      "browseId": "MPREb_qsCfBuLt7jI"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Gandong",
+     "subtitle": "Toton Caribo • 425K plays • Gandong",
+     "videoId": "o8MZwI4O1LE",
+     "thumbnail": "https://yt3.googleusercontent.com/YUybVEyDmUoqPJWNr1gDDjFIkHIknrgnbUjGqRcsjRH3Z_CxLXHbAnJjp2C8_uyJkaIgKl-37cQ69cdNig=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Toton Caribo",
+       "browseId": "UCCKNqoDZthhh5FUqueTs2uA"
+      }
+     ],
+     "album": {
+      "name": "Gandong",
+      "browseId": "MPREb_p3WF38bfL15"
+     }
+    },
+    {
+     "type": "song",
+     "title": "Lilakne Lungamu",
+     "subtitle": "Royal Music & GILGA SAHID • 420K plays • Lilakne Lungamu",
+     "videoId": "IbldM5QRDKk",
+     "thumbnail": "https://yt3.googleusercontent.com/e64Kd4aU5QB0BOkCVGkyoZNxgTzLDO6jWV8c8xD7uJxwhtllG10FDqPmrfWmIkdAlQFCgi5MRGY_Zs7Y=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Royal Music",
+       "browseId": "UChXduz32X5owqnNutT00tow"
+      },
+      {
+       "name": "GILGA SAHID",
+       "browseId": "UCa11wXgKkzkGTuiaSbixXaw"
+      }
+     ],
+     "album": {
+      "name": "Lilakne Lungamu",
+      "browseId": "MPREb_ojvQjODgTLg"
+     }
+    },
+    {
+     "type": "song",
+     "title": "maha benar",
+     "subtitle": "Salma Salsabil • 1.2M plays • maha benar",
+     "videoId": "Q025g3oT9eg",
+     "thumbnail": "https://yt3.googleusercontent.com/P37H0vfcLhmWUX0JZKV2YEsBAkEPzuisLisL9rivr8x1FbnNgh7TYsFJDQH7LzCE0zjTd1g2brkUNOnTiw=w544-h544-l90-rj",
+     "artists": [
+      {
+       "name": "Salma Salsabil",
+       "browseId": "UCLlhAnUI50swVPqYWWdZ92Q"
+      }
+     ],
+     "album": {
+      "name": "maha benar",
+      "browseId": "MPREb_eiFr0g7q4ST"
+     }
+    }
+   ]
+  },
+  {
+   "title": "Trending community playlists",
+   "items": [
+    {
+     "type": "playlist",
+     "title": "Kompilasi Lagu Pop Indonesia 90an",
+     "subtitle": "Dadang Rustiawan • 17M views",
+     "thumbnail": "https://yt3.ggpht.com/2908vJ0ZJUho_pXI5ZdX1068GnxX9sp2G8uFN7FqWTsKUNsxuMnCMo8FITvAI7Hapw0ebmmA6Q=s576",
+     "artists": [
+      {
+       "name": "Dadang Rustiawan",
+       "browseId": "UCnGvEucMqFKWn2fSHeL7afA"
+      }
+     ],
+     "browseId": "VLPLw3xXmiGk7179fZ_q7f3YgmuD05U7ClHr",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "galau inggris",
+     "subtitle": "Resti Laora Cahyeny • 3.3M views",
+     "thumbnail": "https://yt3.googleusercontent.com/DOCADxsKgbDuuqrHTI68WWJd4Tl7q6YQnrKHH412aTaKvv_1IfIRmS3YRq4x548EmOrc-cxcZykz=s576",
+     "artists": [
+      {
+       "name": "Resti Laora Cahyeny",
+       "browseId": "UCbNN-1wTsAP8LhkoKyiJcbg"
+      }
+     ],
+     "browseId": "VLPL0ef2qZfl-_4OfUMaMOL7Rkx5S2TaSee7",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "OBAT NGANTUK FREN",
+     "subtitle": "hizkiagozandri • 1.4M views",
+     "thumbnail": "https://yt3.googleusercontent.com/E35eICNtKJUiZrkbqwJ4qOZrrGqBOlPl9DipAQqATszUv64LilMA37R-iiAKQdM_920w7A5L-Cw=s576",
+     "artists": [
+      {
+       "name": "hizkiagozandri",
+       "browseId": "UCRtAFeMiYDilTv1dZ4zp0Iw"
+      }
+     ],
+     "browseId": "VLPLgp8PI6tWRQuP6NJDoKUhoUuqOl42-Cnl",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "Indonesia Populer 2022",
+     "subtitle": "Mrs. Ika Ayu • 1.2M views",
+     "thumbnail": "https://yt3.googleusercontent.com/0atiQoiHdygW3SIqRlDFwUj9Zas2oNm-bD3GjTbJI6QQrUT0m2vUSQss6Q_KdhkUPpiJr1q0-g=s576",
+     "artists": [
+      {
+       "name": "Mrs. Ika Ayu",
+       "browseId": "UCVKeRZNZvniuRqezKuf-6CA"
+      }
+     ],
+     "browseId": "VLPL-XOmrg6D1r7_6as5qnsiprLJlwKrzJPd",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "mood",
+     "subtitle": "Dandi Gusnico • 404K views",
+     "thumbnail": "https://yt3.googleusercontent.com/65pNi1RNjVeMk8x0HHo9YFQBJ3xLXDyIuk_GL-hdoAA6X6C_WARotoMtG7SAIcKYCGZDh4OPP8U=s576",
+     "artists": [
+      {
+       "name": "Dandi Gusnico",
+       "browseId": "UCjv9VNZboFuBsl7crAHnnEQ"
+      }
+     ],
+     "browseId": "VLPLkas-PBFGodB-TxymcclU-e5O6ElDfyvv",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "santai",
+     "subtitle": "Irudiana00 • 5M views",
+     "thumbnail": "https://yt3.googleusercontent.com/PR-EXqPEf4aHFFLHknd2II-rvvVINdq7mS_eaHe4NEX11w2P6N8SztkPlouSzvGX6gtuMeeJXro=s576",
+     "artists": [
+      {
+       "name": "Irudiana00",
+       "browseId": "UCfZc4orAwn8WDIfP88eISGA"
+      }
+     ],
+     "browseId": "VLPLF3h4hNV9dlgGs8M4x6AXGgn53qlzHF2J",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "Indo 2000an",
+     "subtitle": "Stevany 96 • 4.9M views",
+     "thumbnail": "https://yt3.googleusercontent.com/G1ZUl8f-ZilhaJmecbdixZyhFHXsu7RMddMqY8yfifqBLTVDY11Eeq6AF2ruGKZNY9WFPHbl7Jo=s576",
+     "artists": [
+      {
+       "name": "Stevany 96",
+       "browseId": "UCgVG4S_s7C60-XnKiDJL5pg"
+      }
+     ],
+     "browseId": "VLPL-k3VXCZM5qCr7ZGfPjwNeUIQf1DEoG3D",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "aku kalah",
+     "subtitle": "Fakhri Ramdhani Putra • 3.3M views",
+     "thumbnail": "https://yt3.googleusercontent.com/NmHjblKpqWK0TUBlHc8aLJO1UCUHC1u9Qc3m0hsha9ejzXX61nuK0CiX6ERO-SV8126KDzUI2UMI=s576",
+     "artists": [
+      {
+       "name": "Fakhri Ramdhani Putra",
+       "browseId": "UCLtVzjvNa8iYpfCoTPqv8hA"
+      }
+     ],
+     "browseId": "VLPLWL8-QbG15cKgR3mVD9nhw9PtK4GJaqm5",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "Favorite Indonesian",
+     "subtitle": "Bray • 1.3M views",
+     "thumbnail": "https://yt3.googleusercontent.com/YNoo91TSJfieCZKRLQoZ09mdCkpYs2chqkHPOmRTajmI5V2zskKzWODS2u-Q9LFuu0oxBHSh3Y8=s576",
+     "artists": [
+      {
+       "name": "Bray",
+       "browseId": "UCG1l3Sv0GW--GxRolocmBTg"
+      }
+     ],
+     "browseId": "VLPLj_UNkP_LIIDwoyA0Zgybtug3Qnf8SHqh",
+     "browseType": "playlist"
+    },
+    {
+     "type": "playlist",
+     "title": "Malaysia jadul",
+     "subtitle": "riski amalia • 3.4M views",
+     "thumbnail": "https://yt3.googleusercontent.com/Ju1pfT61fH6FLW84dPQP3BGTkcH0DM3pBkUlVPVg4T0J-DZdV3Sqzenwtl_uAfVF1v0pzYwnOOM=s576",
+     "artists": [
+      {
+       "name": "riski amalia",
+       "browseId": "UCXKN3oGidJiPB2tf0BNUnBg"
+      }
+     ],
+     "browseId": "VLPLe0DI3xoTJy0NulJW9AvCUyrN42RCW8Rw",
+     "browseType": "playlist"
+    }
+   ]
+  }
+ ]
+}

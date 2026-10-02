@@ -46,11 +46,9 @@ class SonoraApi {
   SonoraApi(
     this._settings, {
     http.Client? client,
-    Duration timeout = const Duration(seconds: 20),
+    this._timeout = const Duration(seconds: 20),
   })  : _client = client ?? http.Client(),
-        _ownsClient = client == null,
-        _timeout = timeout;
-
+        _ownsClient = client == null;
   final SettingsStore _settings;
   final http.Client _client;
   final bool _ownsClient;
