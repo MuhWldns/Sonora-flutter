@@ -299,9 +299,10 @@ class _ArtworkViewState extends State<_ArtworkView> {
   String _favoriteKey = '';
 
   @override
-  void initState() {
-    super.initState();
-    _loadFavorite();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Membaca SonoraScope (inherited widget) legal di sini, tidak di initState.
+    if (_favoriteKey != widget.track.videoId) _loadFavorite();
   }
 
   @override

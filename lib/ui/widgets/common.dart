@@ -160,14 +160,9 @@ class _PlayingWaveState extends State<PlayingWave>
   );
 
   @override
-  void initState() {
-    super.initState();
-    if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // MediaQuery dibaca di sini (bukan initState) sesuai kontrak inherited widget.
     if (MediaQuery.disableAnimationsOf(context)) {
       _controller.stop();
     } else if (!_controller.isAnimating) {
@@ -511,12 +506,6 @@ class _SkeletonBoxState extends State<SkeletonBox>
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
-
-  @override
-  void initState() {
-    super.initState();
-    if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
-  }
 
   @override
   void didChangeDependencies() {
