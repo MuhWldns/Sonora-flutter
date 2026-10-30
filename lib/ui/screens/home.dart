@@ -1,5 +1,5 @@
 /// Layar Home: feed personal dari proxy. Menampilkan rak dan daftar lagu asli,
-/// dengan keadaan muat/galat/belum-dikonfigurasi yang eksplisit.
+/// dengan keadaan muat (skeleton), galat, dan belum-dikonfigurasi eksplisit.
 library;
 
 import 'package:flutter/material.dart';
@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } else if (_error != null && _sections == null) {
           body = ErrorState(message: _error!, onRetry: _load);
         } else if (_sections == null) {
-          body = const LoadingState(label: 'Memuat beranda…');
+          body = const SkeletonHomeFeed();
         } else {
           body = RefreshIndicator(
             onRefresh: _load,
@@ -197,19 +197,7 @@ class _HomeFeed extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               if (section.title.isNotEmpty) SectionHeader(title: section.title),
-              SizedBox(
-                height: 214,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
-                  itemCount: section.items.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
-                  itemBuilder: (BuildContext context, int index) {
-                    final MusicItem item = section.items[index];
-                    return ShelfCard(item: item, onOpen: () => actions.open(item));
-                  },
-                ),
-              ),
+              MusicShelf(items: section.items, onOpen: actions.open),
             ],
           );
         },

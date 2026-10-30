@@ -1,11 +1,13 @@
-/// Layar Search: pintu depan pencarian. Kolom pencarian yang menempel, chip
-/// filter Material, hasil berupa baris lagu dan rak. Respons basi diabaikan.
+/// Layar Search: pintu depan pencarian. Kolom pencarian, chip filter, riwayat
+/// pencarian (SQLite lokal), dan hasil berupa baris lagu + rak. Respons basi
+/// diabaikan.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../data/local_database.dart';
 import '../../data/music_models.dart';
 import '../../data/settings_store.dart';
 import '../../data/sonora_api.dart';
@@ -43,6 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _loading = false;
   String? _error;
   String _submitted = '';
+  List<SearchHistoryItem> _history = const <SearchHistoryItem>[];
   SettingsStore? _settings;
 
   @override
@@ -53,6 +56,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _settings?.removeListener(_onSettingsChanged);
       _settings = settings..addListener(_onSettingsChanged);
     }
+    if (_controller.text.isEmpty) _refreshHistory();
   }
 
   @override
@@ -62,6 +66,19 @@ class _SearchScreenState extends State<SearchScreen> {
     _controller.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshHistory() async {
+    final LocalDatabase? db = SonoraScope.of(context).database;
+    if (db == null) {
+      if (mounted && _history.isNotEmpty) {
+        setState(() => _history = const <SearchHistoryItem>[]);
+      }
+      return;
+    }
+    final List<SearchHistoryItem> items = await db.getRecentSearches(limit: 8);
+    if (!mounted) return;
+    setState(() => _history = items);
   }
 
   void _onSettingsChanged() {
@@ -74,6 +91,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = false;
       _submitted = '';
     });
+    _refreshHistory();
   }
 
   void _onChanged(String value) {
@@ -86,6 +104,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
         _submitted = '';
       });
+      _refreshHistory();
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 350), () => _run(value));
@@ -102,6 +121,12 @@ class _SearchScreenState extends State<SearchScreen> {
       _error = null;
       _submitted = trimmed;
     });
+    // Catat riwayat lokal (fitur opsional; kegagalan tidak mengganggu hasil).
+    unawaited(
+      scope.database
+          ?.recordSearch(trimmed, filter: _filter)
+          .catchError((Object _) {}),
+    );
     try {
       final List<MusicSection> sections = await scope.api.search(trimmed, filter: _filter);
       if (!mounted || generation != _generation) return;
@@ -116,6 +141,25 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _applyHistory(String query) {
+    _debounce?.cancel();
+    _controller.text = query;
+    _controller.selection = TextSelection.collapsed(offset: query.length);
+    _run(query);
+  }
+
+  Future<void> _deleteHistoryItem(String query) async {
+    final LocalDatabase? db = SonoraScope.of(context).database;
+    await db?.deleteSearch(query);
+    await _refreshHistory();
+  }
+
+  Future<void> _clearHistory() async {
+    final LocalDatabase? db = SonoraScope.of(context).database;
+    await db?.clearSearchHistory();
+    await _refreshHistory();
   }
 
   void _selectFilter(String? id) {
@@ -134,6 +178,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = false;
       _submitted = '';
     });
+    _refreshHistory();
     _focus.requestFocus();
   }
 
@@ -161,6 +206,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     textInputAction: TextInputAction.search,
                     onChanged: _onChanged,
                     onSubmitted: _run,
+                    style: context.texts.bodyLarge,
                     decoration: InputDecoration(
                       hintText: 'Cari lagu, artis, album…',
                       prefixIcon: const Icon(Icons.search_rounded),
@@ -174,12 +220,12 @@ class _SearchScreenState extends State<SearchScreen> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(kRadiusXl)),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: kSpaceSm),
+                      contentPadding: const EdgeInsets.symmetric(vertical: kSpaceMd),
                     ),
                   ),
                 ),
                 SizedBox(
-                  height: 52,
+                  height: 48,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
@@ -221,15 +267,9 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       );
     }
-    if (_loading) return const LoadingState(label: 'Mencari…');
+    if (_loading) return const SkeletonHomeFeed();
     if (_error != null) return ErrorState(message: _error!, onRetry: () => _run(_submitted));
-    if (_sections == null) {
-      return const EmptyState(
-        icon: Icons.search_rounded,
-        title: 'Cari musik',
-        message: 'Ketik minimal dua huruf untuk mencari lagu, artis, album, atau playlist.',
-      );
-    }
+    if (_sections == null) return _noQueryBody(scope);
     final List<MusicSection> visible = _sections!
         .where((MusicSection section) => section.items.isNotEmpty)
         .toList(growable: false);
@@ -241,6 +281,55 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     return _SearchResults(sections: visible);
+  }
+
+  /// Keadaan tanpa kueri: riwayat pencarian (bila ada) + dorongan awal.
+  Widget _noQueryBody(SonoraScope scope) {
+    if (_history.isEmpty) {
+      return const EmptyState(
+        icon: Icons.search_rounded,
+        title: 'Cari musik',
+        message: 'Ketik minimal dua huruf untuk mencari lagu, artis, album, atau playlist.',
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.only(bottom: kSpaceXxl),
+      children: <Widget>[
+        SectionHeader(
+          title: 'Riwayat pencarian',
+          trailing: TextButton(
+            onPressed: _clearHistory,
+            child: const Text('Hapus'),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
+          child: Wrap(
+            spacing: kSpaceSm,
+            runSpacing: kSpaceSm,
+            children: <Widget>[
+              for (final SearchHistoryItem item in _history)
+                GestureDetector(
+                  onLongPress: () => _deleteHistoryItem(item.query),
+                  child: ActionChip(
+                    avatar: const Icon(Icons.history_rounded, size: 18),
+                    label: Text(item.query),
+                    onPressed: () => _applyHistory(item.query),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: kSpaceXl),
+        EmptyState(
+          icon: Icons.search_rounded,
+          title: 'Cari musik',
+          message:
+              'Ketik minimal dua huruf, atau ketuk riwayat untuk mencari lagi. '
+              'Tekan lama chip untuk menghapusnya.',
+        ),
+      ],
+    );
   }
 }
 
@@ -277,19 +366,7 @@ class _SearchResults extends StatelessWidget {
             ),
           for (final MusicSection section in shelves) ...<Widget>[
             SectionHeader(title: section.title.isEmpty ? 'Lainnya' : section.title),
-            SizedBox(
-              height: 214,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
-                itemCount: section.items.length,
-                separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
-                itemBuilder: (BuildContext context, int index) {
-                  final MusicItem item = section.items[index];
-                  return ShelfCard(item: item, onOpen: () => actions.open(item));
-                },
-              ),
-            ),
+            MusicShelf(items: section.items, onOpen: actions.open),
           ],
         ],
       ),

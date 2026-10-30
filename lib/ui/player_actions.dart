@@ -42,8 +42,28 @@ class PlayerActions {
     }
     Navigator.of(_context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => BrowseScreen(browseId: target, title: item.title),
+        builder: (_) => BrowseScreen(
+          browseId: target,
+          title: item.title,
+          thumbnail: item.thumbnail,
+          typeLabel: _typeLabel(item.type),
+        ),
       ),
     );
+  }
+
+  /// Label overline header Browse dari tipe item proxy.
+  static String _typeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'playlist':
+        return 'Playlist';
+      case 'artist':
+        return 'Artis';
+      case 'video':
+        return 'Video';
+      case 'album':
+      default:
+        return 'Album';
+    }
   }
 }

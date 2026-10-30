@@ -138,15 +138,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text('Server proxy', style: context.texts.titleMedium),
-                  const SizedBox(height: kSpaceXs),
-                  Text(
-                    'Alamat proxy Sonora milikmu (http/https lengkap). '
-                    'Audio dan feed diambil melalui alamat ini.',
-                    style: context.texts.bodyMedium
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: kSpaceLg),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(kSpaceLg),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(kRadiusLg),
+                      border: Border.all(color: scheme.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('Server proxy', style: context.texts.titleMedium),
+                        const SizedBox(height: kSpaceXs),
+                        Text(
+                          'Alamat proxy Sonora milikmu (http/https lengkap). '
+                          'Audio dan feed diambil melalui alamat ini.',
+                          style: context.texts.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: kSpaceLg),
                   TextField(
                     controller: _controller,
                     keyboardType: TextInputType.url,
@@ -205,9 +216,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: kSpaceMd),
                   _testStatus(scope),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: kSpaceXl),
-                  const Divider(),
-                  const SizedBox(height: kSpaceLg),
                   Text('Status', style: context.texts.titleMedium),
                   const SizedBox(height: kSpaceSm),
                   _StatusRow(
@@ -219,7 +231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: kSpaceXl),
                   Text(
-                    'Sonora • proxy stateless • pemutaran melalui relay /stream',
+                    'Proxy stateless • streaming via /stream',
                     style: context.texts.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant),
                     textAlign: TextAlign.center,

@@ -1,5 +1,6 @@
-/// Widget bersama: gambar sampul, baris lagu, kartu rak, header seksi, dan
-/// keadaan kosong/galat. Semua mengambil warna dari tema Sonora.
+/// Widget bersama: gambar sampul, baris lagu, kartu rak, header seksi,
+/// skeleton shimmer, dan keadaan kosong/galat. Semua mengambil warna dari
+/// tema Sonora (Nocturne).
 library;
 
 import 'package:flutter/material.dart';
@@ -90,7 +91,7 @@ class CoverArt extends StatelessWidget {
       );
 }
 
-/// Header seksi bergaya kanon streaming: judul besar, tanpa kicker.
+/// Header seksi: judul besar (titleLarge 21/700) dengan aksi opsional.
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.trailing});
 
@@ -100,7 +101,7 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kSpaceLg, kSpaceMd, kSpaceSm, kSpaceSm),
+      padding: const EdgeInsets.fromLTRB(kSpaceLg, kSpaceXl, kSpaceSm, kSpaceMd),
       child: Row(
         children: <Widget>[
           Expanded(
@@ -118,7 +119,116 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Baris lagu dengan aksi putar dan antrean.
+/// Label kecil huruf besar semua (overline Nocturne 10/700/+0.08em).
+class Overline extends StatelessWidget {
+  const Overline(this.text, {super.key, this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: context.texts.labelSmall?.copyWith(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: color ?? context.scheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+/// Indikator "sedang diputar": empat batang crimson yang menari.
+/// Hormat `MediaQuery.disableAnimations` — bila aktif, batang diam.
+class PlayingWave extends StatefulWidget {
+  const PlayingWave({super.key, this.height = 16, this.width = 17});
+
+  final double height;
+  final double width;
+
+  @override
+  State<PlayingWave> createState() => _PlayingWaveState();
+}
+
+class _PlayingWaveState extends State<PlayingWave>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const List<double> phases = <double>[0.0, 0.25, 0.5, 0.15];
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (BuildContext context, Widget? _) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            for (int i = 0; i < phases.length; i++)
+              _bar(_controller.value, phases[i]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bar(double t, double phase) {
+    final double wave = 0.5 + 0.5 * _sin((t + phase) * 2 * 3.14159);
+    return Expanded(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: FractionallySizedBox(
+          heightFactor: 0.35 + 0.65 * wave,
+          child: Container(
+            width: 3,
+            decoration: BoxDecoration(
+              color: context.sonora.accentText,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static double _sin(double x) {
+    // Kurva sinus ringan tanpa dart:math agar fase tetap sederhana.
+    double v = x % (2 * 3.14159);
+    if (v < 0) v += 2 * 3.14159;
+    return v < 3.14159 ? (v / 3.14159) * 2 - 1 : ((2 * 3.14159 - v) / 3.14159) * 2 - 1;
+  }
+}
+
+/// Baris lagu 56px (kontrak tracklist Nocturne): sampul 44, judul semibold,
+/// subtitel redup; baris aktif diberi tint lembut + [PlayingWave].
 class SongRow extends StatelessWidget {
   const SongRow({
     super.key,
@@ -126,6 +236,7 @@ class SongRow extends StatelessWidget {
     required this.onPlay,
     this.onAddToQueue,
     this.active = false,
+    this.trackNumber,
     this.trailing,
   });
 
@@ -133,62 +244,102 @@ class SongRow extends StatelessWidget {
   final VoidCallback onPlay;
   final void Function(bool next)? onAddToQueue;
   final bool active;
+
+  /// Nomor trek (mis. `01`) yang menggantikan sampul — dipakai layar album.
+  final String? trackNumber;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme scheme = context.scheme;
-    final SonoraColors sonora = context.sonora;
     final bool playable = item.isPlayable;
     final String subtitle = subtitleOf(item);
-    return InkWell(
-      onTap: playable ? onPlay : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSpaceLg, vertical: kSpaceSm),
-        child: Row(
-          children: <Widget>[
-            CoverArt(url: item.thumbnail, size: 48),
-            const SizedBox(width: kSpaceMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.texts.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: active ? sonora.accentText : scheme.onSurface,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.texts.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    final Widget cover = CoverArt(url: item.thumbnail, size: 44);
+    final Widget leading = trackNumber != null
+        ? SizedBox(
+            width: 26,
+            child: Text(
+              trackNumber!,
+              textAlign: TextAlign.center,
+              style: context.texts.bodySmall?.copyWith(
+                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+                color: scheme.onSurfaceVariant,
               ),
             ),
-            if (active)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: kSpaceSm),
-                child: Icon(Icons.graphic_eq_rounded, size: 20, color: sonora.accentText),
-              ),
-            if (trailing != null)
-              trailing!
-            else if (onAddToQueue != null && playable)
-              IconButton(
-                tooltip: 'Tambahkan ke antrean',
-                icon: const Icon(Icons.playlist_add_rounded),
-                onPressed: () => _showQueueMenu(context),
-              ),
-          ],
+          )
+        : (active && playable
+            // Hero hanya pada baris aktif agar tag unik per rute.
+            ? Hero(
+                tag: 'sonora-art-${item.videoId}',
+                child: cover,
+              )
+            : cover);
+    return Material(
+      color: active
+          ? (dark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.04))
+          : Colors.transparent,
+      child: InkWell(
+        onTap: playable ? onPlay : null,
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
+            child: Row(
+              children: <Widget>[
+                leading,
+                const SizedBox(width: kSpaceMd),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.texts.bodyLarge?.copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: active
+                              ? context.sonora.accentText
+                              : scheme.onSurface,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.texts.bodySmall?.copyWith(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (active)
+                  const Padding(
+                    padding: EdgeInsets.only(left: kSpaceSm),
+                    child: PlayingWave(),
+                  ),
+                if (trailing != null)
+                  trailing!
+                else if (onAddToQueue != null && playable)
+                  IconButton(
+                    tooltip: 'Tambahkan ke antrean',
+                    iconSize: 20,
+                    color: scheme.onSurfaceVariant,
+                    icon: const Icon(Icons.more_vert_rounded),
+                    onPressed: () => _showQueueMenu(context),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -265,7 +416,7 @@ class ShelfCard extends StatelessWidget {
         ? artistOf(item)
         : (item.subtitle ?? _capitalize(item.type));
     return SizedBox(
-      width: 152,
+      width: 150,
       child: InkWell(
         borderRadius: BorderRadius.circular(kRadiusMd),
         onTap: onOpen,
@@ -277,7 +428,8 @@ class ShelfCard extends StatelessWidget {
             children: <Widget>[
               CoverArt(
                 url: item.thumbnail,
-                size: 144,
+                size: 150,
+                radius: kRadiusMd,
                 circle: circle,
                 icon: circle ? Icons.person_rounded : Icons.album_rounded,
               ),
@@ -286,19 +438,223 @@ class ShelfCard extends StatelessWidget {
                 item.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: context.texts.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: context.texts.bodyLarge?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               if (subtitle.isNotEmpty)
                 Text(
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: context.texts.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: context.texts.bodySmall?.copyWith(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Tinggi tetap rak [MusicShelf] (sampul 150 + teks dua baris).
+const double kShelfHeight = 202;
+
+/// Rak horizontal satu sumber untuk Home/Search/Browse — menggantikan tiga
+/// salinan pola `SizedBox(height: 214)` + `ListView.separated`.
+class MusicShelf extends StatelessWidget {
+  const MusicShelf({super.key, required this.items, required this.onOpen});
+
+  final List<MusicItem> items;
+  final void Function(MusicItem item) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: kShelfHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
+        itemBuilder: (BuildContext context, int index) =>
+            ShelfCard(item: items[index], onOpen: () => onOpen(items[index])),
+      ),
+    );
+  }
+}
+
+/// Kotak skeleton dengan kilau berjalan. Hormat `MediaQuery.disableAnimations`.
+class SkeletonBox extends StatefulWidget {
+  const SkeletonBox({
+    super.key,
+    this.width,
+    this.height = 12,
+    this.radius = kRadiusSm,
+  });
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  State<SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<SkeletonBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!MediaQuery.disableAnimationsOf(context)) _controller.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = context.scheme;
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.radius),
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            ColoredBox(color: scheme.surfaceContainer),
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (BuildContext context, Widget? _) {
+                final double t = (_controller.value * 2) - 1;
+                return FractionallySizedBox(
+                  alignment: Alignment(t, 0),
+                  widthFactor: 0.6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: <Color>[
+                          Colors.transparent,
+                          (dark ? Colors.white : Colors.black)
+                              .withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kerangka muat beranda: dua rak + daftar baris, meniru bentuk akhir.
+class SkeletonHomeFeed extends StatelessWidget {
+  const SkeletonHomeFeed({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: kSpaceMd, bottom: kSpaceXxl),
+      children: <Widget>[
+        const Padding(
+          padding: EdgeInsets.fromLTRB(kSpaceLg, 0, kSpaceLg, kSpaceMd),
+          child: SkeletonBox(width: 140, height: 20, radius: 6),
+        ),
+        SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
+            itemCount: 3,
+            separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
+            itemBuilder: (BuildContext context, int index) =>
+                const SkeletonBox(width: 150, height: 150, radius: kRadiusMd),
+          ),
+        ),
+        const SizedBox(height: kSpaceXl),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(kSpaceLg, 0, kSpaceLg, kSpaceMd),
+          child: SkeletonBox(width: 180, height: 20, radius: 6),
+        ),
+        SizedBox(
+          height: 220,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
+            itemCount: 2,
+            separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
+            itemBuilder: (BuildContext context, int index) => const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                SkeletonBox(width: 150, height: 150, radius: kRadiusMd),
+                SizedBox(height: kSpaceSm),
+                SkeletonBox(width: 110, height: 12),
+                SizedBox(height: kSpaceXs),
+                SkeletonBox(width: 70, height: 10),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: kSpaceLg),
+        for (int i = 0; i < 4; i++) ...<Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: kSpaceLg,
+              vertical: kSpaceMd,
+            ),
+            child: Row(
+              children: <Widget>[
+                const SkeletonBox(width: 44, height: 44),
+                const SizedBox(width: kSpaceMd),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SkeletonBox(height: 12),
+                      SizedBox(height: kSpaceXs),
+                      SkeletonBox(width: 120, height: 10),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -331,7 +687,7 @@ class EmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHigh,
+                color: scheme.surfaceContainer,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 34, color: scheme.onSurfaceVariant),
@@ -403,7 +759,7 @@ class ErrorState extends StatelessWidget {
   }
 }
 
-/// Indikator muat tengah.
+/// Indikator muat tengah (dipakai layar non-feed; feed memakai skeleton).
 class LoadingState extends StatelessWidget {
   const LoadingState({super.key, this.label});
 
