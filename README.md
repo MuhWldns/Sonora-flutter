@@ -17,10 +17,12 @@ Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bers
 - 🔍 **Pencarian Musik**: Pencarian debounced dengan filter kategori: *Semua*, *Lagu*, *Video*, *Album*, *Artis*, dan *Playlist*.
 - 📂 **Halaman Browse**: Menampilkan detail album, artis, atau playlist dengan aksi *Putar semua* dan pemutaran lagu individual.
 - 🎵 **Pemutar Musik Native**:
-  - Mini-player persisten di bagian bawah layar.
-  - Full player modal dengan visual artwork, seekbar interaktif, transport controls (play, pause, next, previous).
+  - Mini-player persisten bergaya dock kaca (blur) dengan micro-bar progres.
+  - Full player modal: artwork dengan glow ambien, seekbar interaktif, transport controls (play, pause, next, previous).
+  - **Lirik tersinkronisasi** dari LRCLIB: baris aktif crimson, auto-scroll, ketuk baris untuk lompat, latar artwork blur.
   - Mode putar acak (*shuffle*) dan pengulangan (*repeat off / all / one*).
-  - Tampilan dan pengelolaan antrean lagu (*queue*).
+  - Tampilan dan pengelolaan antrean lagu (*queue*) yang dapat diurutkan dan dihapus.
+  - Tombol favorit ♥ yang tersimpan lokal (`favorite_tracks`).
 - 📱 **Android Background Playback**:
   - Berjalan di latar belakang via Android Foreground Service (`audio_service` + `just_audio`).
   - Notifikasi kontrol media native dengan tombol play/pause/skip dan artwork.
@@ -29,14 +31,14 @@ Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bers
   - Input URL proxy di menu Pengaturan tanpa hardcode alamat server privat.
   - Fitur pengujian koneksi langsung (`/healthz`).
   - Penghentian audio otomatis saat endpoint proxy berganti untuk mencegah kebocoran stream antar-server.
-- 🎨 **Desain Elegan Sonora**:
-  - Aksen warna khas Amber Sonora (`#F59E0B`).
-  - Mendukung tema Material 3 Terang (*Light*) dan Gelap (*Dark*) mengikuti preferensi sistem.
-  - Penanganan status koneksi: belum dikonfigurasi, memuat (*loading*), kosong (*empty*), dan error jaringan yang informatif.
+- 🎨 **Desain Nocturne Audio**:
+  - Gelap atmosferik dengan aksen crimson tunggal (`#E03A3E`), tipografi **Plus Jakarta Sans**.
+  - Mendukung tema Gelap (utama) dan Terang (derivasi) mengikuti preferensi sistem.
+  - Skeleton loading ber-shimmer, status koneksi informatif, transisi Hero artwork ke pemutar penuh.
 - 💾 **Penyimpanan Lokal SQLite (3 Tabel Offline)**:
   - `playback_history`: Riwayat pemutaran lagu lokal di perangkat dengan pembatasan otomatis 100 entri.
-  - `favorite_tracks`: Penyimpanan lagu favorit yang disukai pengguna secara offline.
-  - `search_history`: Riwayat kata kunci pencarian terakhir beserta frekuensi cari dan filter.
+  - `favorite_tracks`: Lagu favorit yang disukai pengguna secara offline (tombol ♥ di pemutar penuh).
+  - `search_history`: Riwayat kata kunci pencarian — tampil sebagai chips di layar Cari (tekan lama untuk hapus).
 ---
 
 ## 🏗️ Arsitektur
@@ -142,11 +144,12 @@ flutter test
 
 ```
 lib/
-├── main.dart               # Inisialisasi asinkron settings, API, & AudioService
+├── main.dart               # Inisialisasi asinkron settings, API, AudioService, & SQLite
 ├── data/
 │   ├── music_models.dart   # Model MusicItem & MusicSection (toleran InnerTube JSON)
 │   ├── settings_store.dart # Pengelolaan persistensi URL proxy (SharedPreferences)
 │   ├── sonora_api.dart     # Klien HTTP proxy Sonora
+│   ├── lyrics_store.dart   # Klien LRCLIB + parser LRC (lirik tersinkronisasi)
 │   └── local_database.dart # Basis data SQLite lokal (3 tabel: history, favorites, searches)
 ├── playback/
 │   └── sonora_audio_handler.dart # AudioHandler, just_audio, native notification & background

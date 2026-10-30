@@ -51,3 +51,6 @@ docs/
 .env
 .env.*
 !.env.example
+
+# ZCode workspace config
+.zcode/
