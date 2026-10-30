@@ -59,40 +59,51 @@ class MiniPlayer extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(kSpaceSm, kSpaceSm + 2, kSpaceSm, kSpaceSm),
-                    child: Row(
-                      children: <Widget>[
-                        CoverArt(url: track.thumbnail, size: 44),
-                        const SizedBox(width: kSpaceMd),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                track.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.texts.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                snap.error ?? track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.texts.bodySmall?.copyWith(
-                                  fontSize: 12,
-                                  color: snap.error != null
-                                      ? context.scheme.error
-                                      : context.scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
+                  // Seluruh dock dapat diketuk untuk membuka pemutar penuh;
+                  // tombol play di dalamnya memiliki InkWell sendiri sehingga
+                  // tetap menang gesture arena di areanya.
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => openFullPlayer(context),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          kSpaceSm, kSpaceSm + 2, kSpaceSm, kSpaceSm,
                         ),
-                        _DockPlayButton(player: player, snap: snap),
-                      ],
+                        child: Row(
+                          children: <Widget>[
+                            CoverArt(url: track.thumbnail, size: 44),
+                            const SizedBox(width: kSpaceMd),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    track.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.texts.bodyMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    snap.error ?? track.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.texts.bodySmall?.copyWith(
+                                      fontSize: 12,
+                                      color: snap.error != null
+                                          ? context.scheme.error
+                                          : context.scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _DockPlayButton(player: player, snap: snap),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
