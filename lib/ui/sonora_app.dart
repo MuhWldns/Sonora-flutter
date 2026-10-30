@@ -1,13 +1,14 @@
 /// Titik masuk UI Sonora.
 ///
 /// Konstruktor persis seperti yang dipanggil `lib/main.dart`:
-/// `SonoraApp(settings:, api:, audio:)`. Widget ini memasang tema Material 3
-/// amber hangat (terang & gelap mengikuti sistem), menyediakan dependensi ke
-/// subtree, dan merakit pemutar + navigasi.
+/// `SonoraApp(settings:, api:, audio:, database:)`. Widget ini memasang tema
+/// Nocturne (dark atmosferik + derivasi terang, aksen crimson), menyediakan
+/// dependensi ke subtree, dan merakit pemutar + navigasi.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../data/local_database.dart';
 import '../data/settings_store.dart';
 import '../data/sonora_api.dart';
 import '../playback/sonora_audio_handler.dart';
@@ -22,11 +23,13 @@ class SonoraApp extends StatefulWidget {
     required this.settings,
     required this.api,
     required this.audio,
+    this.database,
   });
 
   final SettingsStore settings;
   final SonoraApi api;
   final SonoraAudioHandler audio;
+  final LocalDatabase? database;
 
   @override
   State<SonoraApp> createState() => _SonoraAppState();
@@ -50,6 +53,7 @@ class _SonoraAppState extends State<SonoraApp> {
       api: widget.api,
       player: _player,
       tabs: _tabs,
+      database: widget.database,
       child: MaterialApp(
         title: 'Sonora',
         debugShowCheckedModeBanner: false,

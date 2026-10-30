@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/widgets.dart';
 
+import '../data/local_database.dart';
 import '../data/settings_store.dart';
 import '../data/sonora_api.dart';
 import 'player/player_controller.dart';
@@ -40,6 +41,7 @@ class SonoraScope extends InheritedWidget {
     required this.api,
     required this.player,
     required this.tabs,
+    this.database,
     required super.child,
   });
 
@@ -47,6 +49,10 @@ class SonoraScope extends InheritedWidget {
   final SonoraApi api;
   final PlayerController player;
   final AppTabController tabs;
+
+  /// Basis data lokal opsional (riwayat pencarian, favorit). `null` bila
+  /// perangkat tidak mendukung SQLite — fitur terkait turun dengan anggun.
+  final LocalDatabase? database;
 
   static SonoraScope of(BuildContext context) {
     final SonoraScope? scope =
