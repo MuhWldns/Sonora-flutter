@@ -1,51 +1,19 @@
-# Sonora-flutter
+# Sonora Flutter
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.12+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-**Sonora-flutter** adalah aplikasi client musik Android berbasis Flutter untuk proxy backend mandiri (*self-hosted*) [Sonora Music](https://github.com/MuhWldns/Sonora-Music).
+Klien musik Android berbasis Flutter untuk proxy backend mandiri (*self-hosted*) [Sonora Music](https://github.com/MuhWldns/Sonora-Music).
 
-Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bersih, cepat, dan independen. Klien Flutter menangani antarmuka pengguna serta pemutaran audio native di Android, sedangkan proxy Node.js bertugas menangani deciphering InnerTube, bypass PO token (BotGuard/WebPO), dan relay streaming audio.
+Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bersih, cepat, dan independen. Klien Flutter menangani antarmuka pengguna serta pemutaran audio native di Android, sedangkan proxy Node.js bertugas menangani deciphering InnerTube, penanganan PO token (BotGuard/WebPO), dan relay streaming audio. Klien tidak pernah berkomunikasi langsung dengan YouTube/InnerTube dan tidak menyimpan kredensial apa pun.
 
----
-
-## ✨ Fitur Utama (MVP)
-
-- 🏠 **Home Feed**: Menampilkan rekomendasi lagu dan playlist publik secara langsung dari endpoint proxy `/home`.
-- 🔍 **Pencarian Musik**: Pencarian debounced dengan filter kategori: *Semua*, *Lagu*, *Video*, *Album*, *Artis*, dan *Playlist*.
-- 📂 **Halaman Browse**: Menampilkan detail album, artis, atau playlist dengan aksi *Putar semua* dan pemutaran lagu individual.
-- 🎵 **Pemutar Musik Native**:
-  - Mini-player persisten bergaya dock kaca (blur) dengan micro-bar progres.
-  - Full player modal: artwork dengan glow ambien, seekbar interaktif, transport controls (play, pause, next, previous).
-  - **Lirik tersinkronisasi** dari LRCLIB: baris aktif crimson, auto-scroll, ketuk baris untuk lompat, latar artwork blur.
-  - Mode putar acak (*shuffle*) dan pengulangan (*repeat off / all / one*).
-  - Tampilan dan pengelolaan antrean lagu (*queue*) yang dapat diurutkan dan dihapus.
-  - Tombol favorit ♥ yang tersimpan lokal (`favorite_tracks`).
-- 📱 **Android Background Playback**:
-  - Berjalan di latar belakang via Android Foreground Service (`audio_service` + `just_audio`).
-  - Notifikasi kontrol media native dengan tombol play/pause/skip dan artwork.
-  - Penanganan interupsi audio (telepon masuk, headphone dicabut/becoming noisy).
-- ⚙️ **Konfigurasi Proxy**:
-  - Input URL proxy di menu Pengaturan tanpa hardcode alamat server privat.
-  - Fitur pengujian koneksi langsung (`/healthz`).
-  - Penghentian audio otomatis saat endpoint proxy berganti untuk mencegah kebocoran stream antar-server.
-- 🎨 **Desain Nocturne Audio**:
-  - Gelap atmosferik dengan aksen crimson tunggal (`#E03A3E`), tipografi **Plus Jakarta Sans**.
-  - Mendukung tema Gelap (utama) dan Terang (derivasi) mengikuti preferensi sistem.
-  - Skeleton loading ber-shimmer, status koneksi informatif, transisi Hero artwork ke pemutar penuh.
-- 💾 **Penyimpanan Lokal SQLite (3 Tabel Offline)**:
-  - `playback_history`: Riwayat pemutaran lagu lokal di perangkat dengan pembatasan otomatis 100 entri.
-  - `favorite_tracks`: Lagu favorit yang disukai pengguna secara offline (tombol ♥ di pemutar penuh).
-  - `search_history`: Riwayat kata kunci pencarian — tampil sebagai chips di layar Cari (tekan lama untuk hapus).
----
-
-## 🏗️ Arsitektur
+## Arsitektur
 
 ```
 ┌────────────────────────────────────────┐
-│           Sonora-flutter               │
+│           Sonora Flutter               │
 │  (Flutter UI + just_audio Media Engine)│
 └──────────────────┬─────────────────────┘
                    │
@@ -64,108 +32,131 @@ Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bers
 └────────────────────────────────────────┘
 ```
 
-> **Catatan PO Token:** Client Flutter **tidak** mengimplementasikan decipher token atau BotGuard sendiri. Semua deciphering dan streaming token ditangani oleh proxy Sonora di sisi server, sehingga client cukup melakukan streaming melalui `/stream?videoId=...`.
+> **Catatan PO token:** klien Flutter tidak mengimplementasikan deciphering token maupun BotGuard. Seluruh proses tersebut ditangani proxy Sonora di sisi server, sehingga klien cukup melakukan streaming melalui `/stream?videoId=...`.
 
----
+## Fitur
 
-## 🚀 Memulai
+- **Beranda** — feed rekomendasi lagu dan playlist publik dari endpoint proxy `/home`, dengan skeleton loading dan status koneksi yang informatif.
+- **Pencarian** — pencarian *debounced* dengan filter kategori (Semua, Lagu, Video, Album, Artis, Playlist) serta riwayat pencarian lokal berbasis SQLite.
+- **Browse** — halaman detail album, artis, atau playlist dengan header artwork besar, aksi *Putar semua* dan *Acak*, serta daftar lagu bernomor.
+- **Pemutar musik native**
+  - Mini-player persisten bergaya dock kaca (blur) dengan micro-bar progres.
+  - Full player dengan artwork ber-glow ambien, seekbar interaktif, dan kontrol transport lengkap.
+  - Lirik tersinkronisasi dari [LRCLIB](https://lrclib.net): baris aktif disorot, auto-scroll mengikuti lagu, ketuk baris untuk melompat.
+  - Mode acak (*shuffle*) dan pengulangan (*repeat off / all / one*).
+  - Antrean lagu yang dapat diurutkan, diputar ulang, dan dihapus.
+  - Penandaan lagu favorit yang tersimpan di perangkat.
+- **Pemutaran latar belakang Android**
+  - Berjalan sebagai Foreground Service (`audio_service` + `just_audio`).
+  - Notifikasi kontrol media native dengan artwork.
+  - Penanganan interupsi audio (panggilan masuk, headphone dicabut).
+- **Konfigurasi proxy**
+  - Input URL proxy melalui menu Pengaturan, tanpa alamat server yang di-hardcode.
+  - Pengujian koneksi langsung ke endpoint `/healthz`.
+  - Penghentian audio otomatis saat endpoint berganti untuk mencegah kebocoran stream antar-server.
+- **Penyimpanan lokal (SQLite, 3 tabel)**
+  - `playback_history`: riwayat pemutaran di perangkat (maksimal 100 entri terbaru).
+  - `favorite_tracks`: daftar lagu favorit offline.
+  - `search_history`: riwayat kata kunci pencarian beserta frekuensi.
+- **Desain Nocturne Audio** — tema gelap atmosferik dengan aksen crimson tunggal (`#E03A3E`), tipografi Plus Jakarta Sans, dan dukungan tema terang sebagai derivasi.
+
+## Memulai
 
 ### Prasyarat
 
-- **Flutter SDK**: 3.44.2 atau lebih baru (Dart 3.12+).
-- **Android SDK**: API level 21 s/d 36+.
-- **Proxy Sonora**: Instance Node.js Sonora Music yang aktif dan dapat diakses.
+- Flutter SDK 3.44.2 atau lebih baru (Dart 3.12+).
+- Android SDK, API level 21 sampai 36+.
+- Instance proxy Sonora Music yang aktif dan dapat diakses.
 
-### Instalasi & Menjalankan
+### Instalasi
 
 1. Clone repository:
+
    ```sh
    git clone https://github.com/MuhWldns/Sonora-flutter.git
    cd Sonora-flutter
    ```
 
 2. Unduh dependensi:
+
    ```sh
    flutter pub get
    ```
 
-3. Jalankan aplikasi di perangkat/emulator Android:
+3. Jalankan pada perangkat atau emulator Android:
+
    ```sh
    flutter run
    ```
 
-4. Buka menu **Pengaturan**, masukkan URL proxy Sonora Anda (misalnya `https://sonora.example.com`), klik **Uji Koneksi**, lalu **Simpan**.
+4. Buka menu **Pengaturan**, masukkan URL proxy Sonora Anda (misalnya `https://sonora.example.com`), tekan **Tes koneksi**, lalu **Simpan**.
 
-### Build dengan Default Proxy (Opsional)
-
-Anda dapat menyematkan URL proxy default saat build tanpa harus menginput manual di aplikasi:
+Sebagai alternatif, URL proxy dapat disematkan saat build melalui `--dart-define` sehingga tidak perlu diisi manual:
 
 ```sh
 flutter run --dart-define=SONORA_PROXY_URL=https://sonora.example.com
 ```
 
----
-
-## 📦 Build APK Android
-
-Untuk membuat file APK Android:
+### Build APK
 
 ```sh
 flutter build apk --debug
 ```
 
-File APK akan tersedia di:
-```
-build/app/outputs/flutter-apk/app-debug.apk
-```
+Hasil build tersedia di `build/app/outputs/flutter-apk/app-debug.apk`. Untuk build release dengan signing key milik Anda sendiri:
 
-Untuk build release dengan signing key Anda sendiri:
 ```sh
 flutter build apk --release
 ```
 
----
+## Pengujian
 
-## 🧪 Pengujian & Analisis Kode
-
-Aplikasi ini menggunakan pengujian ketat pada boundary data, model parsing, sanitasi URL, dan penanganan kegagalan proxy:
+Pengujian mencakup boundary data, parsing model, normalisasi dan sanitasi URL, persistensi pengaturan, serta operasi basis data lokal:
 
 ```sh
-# Analisis statis linter (0 issues)
+# Analisis statis (harus 0 issues)
 flutter analyze
 
-# Menjalankan unit test & regression suite (28/28 passing)
+# Unit test dan regression suite (28 test)
 flutter test
 ```
 
----
-
-## 📂 Struktur Proyek
+## Struktur Proyek
 
 ```
 lib/
-├── main.dart               # Inisialisasi asinkron settings, API, AudioService, & SQLite
+├── main.dart                     # Bootstrap asinkron: settings, API, AudioService, SQLite
 ├── data/
-│   ├── music_models.dart   # Model MusicItem & MusicSection (toleran InnerTube JSON)
-│   ├── settings_store.dart # Pengelolaan persistensi URL proxy (SharedPreferences)
-│   ├── sonora_api.dart     # Klien HTTP proxy Sonora
-│   ├── lyrics_store.dart   # Klien LRCLIB + parser LRC (lirik tersinkronisasi)
-│   └── local_database.dart # Basis data SQLite lokal (3 tabel: history, favorites, searches)
+│   ├── music_models.dart         # Model MusicItem & MusicSection (toleran terhadap JSON InnerTube)
+│   ├── settings_store.dart       # Persistensi URL proxy (SharedPreferences)
+│   ├── sonora_api.dart           # Klien HTTP untuk proxy Sonora
+│   ├── lyrics_store.dart         # Klien LRCLIB dan parser LRC (lirik tersinkronisasi)
+│   └── local_database.dart       # SQLite lokal: history, favorites, searches
 ├── playback/
-│   └── sonora_audio_handler.dart # AudioHandler, just_audio, native notification & background
-    ├── sonora_app.dart     # Root widget aplikasi Sonora
-    ├── theme.dart          # Tema Amber Material 3 Sonora (Light/Dark)
-    ├── app_scope.dart      # InheritedScope penyedia state & pengendali
-    ├── root_shell.dart     # Navigasi tab utama & penempatan mini-player
-    ├── player_actions.dart # Abstraksi aksi pemutar (play, queue, browse)
-    ├── player/             # Controller pemutar, mini-player, & full player view
-    ├── screens/            # Layar Home, Search, Browse, dan Settings
-    └── widgets/            # Komponen kartu musik, dialog, dan helper UI
+│   └── sonora_audio_handler.dart # AudioHandler, notifikasi native, pemutaran latar belakang
+└── ui/
+    ├── sonora_app.dart           # Root widget dan pemasangan tema
+    ├── theme.dart                # Tema Nocturne Audio (gelap/terang), token warna & tipografi
+    ├── app_scope.dart            # SonoraScope (InheritedWidget) penyedia dependensi
+    ├── root_shell.dart           # Navigasi tab utama dan penempatan mini-player
+    ├── player_actions.dart       # Fasad aksi pemutar (play, queue, browse)
+    ├── player/                   # PlayerController, mini-player, full player, lirik, antrean
+    ├── screens/                  # Layar Beranda, Cari, Browse, dan Pengaturan
+    └── widgets/                  # Komponen bersama: baris lagu, shelf, skeleton, state UI
 ```
 
----
+## Lisensi
 
-## 📜 Lisensi
+Proyek ini dilisensikan di bawah [Lisensi MIT](LICENSE).
 
-Proyek ini dilisensikan di bawah lisensi [MIT](LICENSE).
-Aplikasi ini ditujukan untuk penggunaan pribadi (*self-hosted personal music player*).
+```
+Copyright (c) 2026 MuhWldns
+```
+
+Lisensi MIT merupakan lisensi perangkat lunak bebas yang permisif. Anda bebas menggunakan, menyalin, memodifikasi, menggabungkan, mendistribusikan, mensublisensikan, dan menjual salinan perangkat lunak ini, dengan satu-satunya kewajiban untuk menyertakan pemberitahuan hak cipta dan izin di atas pada setiap salinan atau bagian yang substantif dari perangkat lunak. Perangkat lunak disediakan "sebagaimana adanya", tanpa jaminan dalam bentuk apa pun; pembuat dan pemegang hak cipta tidak bertanggung jawab atas klaim, kerusakan, atau kewajiban apa pun yang timbul dari penggunaannya.
+
+### Pemberitahuan dan Batasan Penggunaan
+
+- Proyek ini **tidak berafiliasi, tidak didukung, dan tidak terhubung** dengan YouTube, Google LLC, maupun entitas afiliasinya mana pun. "YouTube" dan "YouTube Music" adalah merek dagang milik Google LLC dan digunakan di sini semata untuk keperluan identifikasi.
+- Aplikasi ini **tidak meng-hosting, mengunggah, atau menyimpan** berkas musik berhak cipta. Seluruh audio dialirkan melalui proxy Sonora yang dioperasikan sendiri oleh pengguna dan tetap tunduk pada ketentuan layanan penyedia konten terkait.
+- Aplikasi ini dimaksudkan untuk **penggunaan pribadi** (*self-hosted personal music player*). Setiap pengguna bertanggung jawab sepenuhnya atas kepatuhan terhadap hukum dan ketentuan layanan yang berlaku di yurisdiksinya masing-masing.
