@@ -1,7 +1,9 @@
-/// Widget bersama: gambar sampul, baris lagu, kartu rak, header seksi,
+﻿/// Widget bersama: gambar sampul, baris lagu, kartu rak, header seksi,
 /// skeleton shimmer, dan keadaan kosong/galat. Semua mengambil warna dari
 /// tema Sonora (Nocturne).
 library;
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -29,7 +31,7 @@ String artistOf(MusicItem item) => item.artist;
 String subtitleOf(MusicItem item) {
   final String artist = item.artist;
   final String duration = item.duration ?? '';
-  if (artist.isNotEmpty && duration.isNotEmpty) return '$artist • $duration';
+  if (artist.isNotEmpty && duration.isNotEmpty) return '$artist ΓÇó $duration';
   if (artist.isNotEmpty) return artist;
   return item.subtitle ?? duration;
 }
@@ -41,6 +43,7 @@ class CoverArt extends StatelessWidget {
   const CoverArt({
     super.key,
     this.url,
+    this.localPath,
     required this.size,
     this.circle = false,
     this.radius = kRadiusSm,
@@ -48,6 +51,7 @@ class CoverArt extends StatelessWidget {
   });
 
   final String? url;
+  final String? localPath;
   final double size;
   final bool circle;
   final double radius;
@@ -66,8 +70,16 @@ class CoverArt extends StatelessWidget {
         height: size,
         child: ColoredBox(
           color: scheme.surfaceContainerHighest,
-          child: source == null
-              ? _fallback(scheme)
+            child: localPath != null
+                ? Image.file(
+                    File(localPath!),
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                    errorBuilder: (_, _, _) => _fallback(scheme),
+                  )
+                : source == null
+                ? _fallback(scheme)
               : Image.network(
                   source,
                   fit: BoxFit.cover,
@@ -141,7 +153,7 @@ class Overline extends StatelessWidget {
 }
 
 /// Indikator "sedang diputar": empat batang crimson yang menari.
-/// Hormat `MediaQuery.disableAnimations` — bila aktif, batang diam.
+/// Hormat `MediaQuery.disableAnimations` ΓÇö bila aktif, batang diam.
 class PlayingWave extends StatefulWidget {
   const PlayingWave({super.key, this.height = 16, this.width = 17});
 
@@ -240,7 +252,7 @@ class SongRow extends StatelessWidget {
   final void Function(bool next)? onAddToQueue;
   final bool active;
 
-  /// Nomor trek (mis. `01`) yang menggantikan sampul — dipakai layar album.
+  /// Nomor trek (mis. `01`) yang menggantikan sampul ΓÇö dipakai layar album.
   final String? trackNumber;
   final Widget? trailing;
 
@@ -459,7 +471,7 @@ class ShelfCard extends StatelessWidget {
 /// Tinggi tetap rak [MusicShelf] (sampul 150 + teks dua baris).
 const double kShelfHeight = 202;
 
-/// Rak horizontal satu sumber untuk Home/Search/Browse — menggantikan tiga
+/// Rak horizontal satu sumber untuk Home/Search/Browse ΓÇö menggantikan tiga
 /// salinan pola `SizedBox(height: 214)` + `ListView.separated`.
 class MusicShelf extends StatelessWidget {
   const MusicShelf({super.key, required this.items, required this.onOpen});

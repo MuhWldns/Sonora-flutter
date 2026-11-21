@@ -12,6 +12,7 @@ import '../../data/sonora_api.dart';
 import '../app_scope.dart';
 import '../player/player_controller.dart';
 import '../player_actions.dart';
+import '../player/player_chrome.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -22,6 +23,7 @@ class BrowseScreen extends StatefulWidget {
     required this.title,
     this.thumbnail,
     this.typeLabel = 'Album',
+    this.collectionItem,
   });
 
   final String browseId;
@@ -30,6 +32,7 @@ class BrowseScreen extends StatefulWidget {
 
   /// Label jenis sumber untuk overline header (album/playlist/artis).
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -50,8 +53,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final int generation = ++_generation;
     setState(() => _error = null);
     try {
-      final List<MusicSection> sections =
-          await SonoraScope.of(context).api.browse(widget.browseId);
+      final List<MusicSection> sections = await SonoraScope.of(
+        context,
+      ).api.browse(widget.browseId);
       if (!mounted || generation != _generation) return;
       setState(() => _sections = sections);
     } catch (error) {
@@ -88,16 +92,52 @@ class _BrowseScreenState extends State<BrowseScreen> {
               child: _error != null && sections == null
                   ? ErrorState(message: _error!, onRetry: _load)
                   : sections == null
-                      ? const SkeletonHomeFeed()
-                      : _BrowseBody(
-                          sections: sections,
-                          title: widget.title,
-                          thumbnail: widget.thumbnail,
-                          typeLabel: widget.typeLabel,
-                        ),
+                  ? const SkeletonHomeFeed()
+                  : _BrowseBody(
+                      sections: sections,
+                      title: widget.title,
+                      thumbnail: widget.thumbnail,
+                      typeLabel: widget.typeLabel,
+                      collectionItem: widget.collectionItem,
+                    ),
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const MiniPlayer(),
+          NavigationBar(
+            selectedIndex: SonoraScope.of(context).tabs.index,
+            onDestinationSelected: (index) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              SonoraScope.of(context).tabs.goTo(index);
+            },
+            destinations: const <Widget>[
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Beranda',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.search_outlined),
+                selectedIcon: Icon(Icons.search_rounded),
+                label: 'Cari',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_music_outlined),
+                selectedIcon: Icon(Icons.library_music_rounded),
+                label: 'Koleksi',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings_rounded),
+                label: 'Pengaturan',
+              ),
+            ],
+          ),
+        ],
       ),
       backgroundColor: scheme.surface,
     );
@@ -110,12 +150,14 @@ class _BrowseBody extends StatelessWidget {
     required this.title,
     required this.thumbnail,
     required this.typeLabel,
+    required this.collectionItem,
   });
 
   final List<MusicSection> sections;
   final String title;
   final String? thumbnail;
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   Widget build(BuildContext context) {
@@ -150,23 +192,28 @@ class _BrowseBody extends StatelessWidget {
               title: title,
               thumbnail: thumbnail,
               typeLabel: typeLabel,
+              collectionItem: collectionItem,
             );
           }
           final MusicSection section = visible[index - 1];
-          final bool songList = section.items.every((MusicItem item) => item.isPlayable);
+          final bool songList = section.items.every(
+            (MusicItem item) => item.isPlayable,
+          );
           if (songList) {
             final int startNumber = _numberBase(visible, section);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                if (section.title.isNotEmpty) SectionHeader(title: section.title),
+                if (section.title.isNotEmpty)
+                  SectionHeader(title: section.title),
                 for (final (int i, MusicItem item) in section.items.indexed)
                   SongRow(
                     item: item,
                     trackNumber: (startNumber + i).toString().padLeft(2, '0'),
                     active: actions.activeVideoId == item.videoId,
                     onPlay: () => actions.play(item),
-                    onAddToQueue: (bool next) => actions.addToQueue(item, next: next),
+                    onAddToQueue: (bool next) =>
+                        actions.addToQueue(item, next: next),
                   ),
               ],
             );
@@ -188,12 +235,57 @@ class _BrowseBody extends StatelessWidget {
     int base = 1;
     for (final MusicSection section in visible) {
       if (identical(section, current)) break;
-      if (section.items.isNotEmpty && section.items.every((MusicItem i) => i.isPlayable)) {
+      if (section.items.isNotEmpty &&
+          section.items.every((MusicItem i) => i.isPlayable)) {
         base += section.items.length;
       }
     }
     return base;
   }
+}
+
+class _SaveCollectionCheckbox extends StatefulWidget {
+  const _SaveCollectionCheckbox({required this.item});
+  final MusicItem item;
+
+  @override
+  State<_SaveCollectionCheckbox> createState() =>
+      _SaveCollectionCheckboxState();
+}
+
+class _SaveCollectionCheckboxState extends State<_SaveCollectionCheckbox> {
+  bool _saved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final value = await SonoraScope.of(
+        context,
+      ).database.isCollectionSaved(widget.item);
+      if (mounted) setState(() => _saved = value);
+    });
+  }
+
+  Future<void> _toggle(bool value) async {
+    final db = SonoraScope.of(context).database;
+    if (value) {
+      await db.saveCollection(widget.item);
+    } else {
+      await db.removeCollection(widget.item);
+    }
+    if (mounted) setState(() => _saved = value);
+  }
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: context.scheme.surface.withValues(alpha: 0.85),
+    shape: const CircleBorder(),
+    child: Checkbox(
+      value: _saved,
+      onChanged: (value) => _toggle(value ?? false),
+    ),
+  );
 }
 
 /// Header artwork besar: overline jenis, judul display, aksi Putar semua/Acak.
@@ -204,6 +296,7 @@ class _BrowseHeader extends StatelessWidget {
     required this.title,
     required this.thumbnail,
     required this.typeLabel,
+    required this.collectionItem,
   });
 
   final List<MusicItem> playable;
@@ -211,6 +304,7 @@ class _BrowseHeader extends StatelessWidget {
   final String title;
   final String? thumbnail;
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +332,9 @@ class _BrowseHeader extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(kRadiusXl),
               child: CoverArt(
-                url: thumbnail,
+                url:
+                    thumbnail ??
+                    (playable.isNotEmpty ? playable.first.thumbnail : null),
                 size: artSize,
                 radius: kRadiusXl,
               ),
@@ -267,9 +363,11 @@ class _BrowseHeader extends StatelessWidget {
                           ? null
                           : () => actions.playQueue(playable),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text(playable.isEmpty
-                          ? 'Putar semua'
-                          : 'Putar semua (${playable.length})'),
+                      label: Text(
+                        playable.isEmpty
+                            ? 'Putar semua'
+                            : 'Putar semua (${playable.length})',
+                      ),
                     ),
                   ),
                   const SizedBox(width: kSpaceMd),
@@ -285,6 +383,10 @@ class _BrowseHeader extends StatelessWidget {
                       label: const Text('Acak'),
                     ),
                   ),
+                  if (collectionItem != null) ...<Widget>[
+                    const SizedBox(width: kSpaceSm),
+                    _SaveCollectionCheckbox(item: collectionItem!),
+                  ],
                 ],
               ),
             ],

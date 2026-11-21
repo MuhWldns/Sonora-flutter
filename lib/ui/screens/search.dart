@@ -1,6 +1,4 @@
-/// Layar Search: pintu depan pencarian. Kolom pencarian, chip filter, riwayat
-/// pencarian (SQLite lokal), dan hasil berupa baris lagu + rak. Respons basi
-/// diabaikan.
+/// Layar Cari: riwayat pencarian lokal dan hasil dari proxy Sonora.
 library;
 
 import 'dart:async';
@@ -17,14 +15,14 @@ import '../player_actions.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// Opsi filter; `null` berarti semua.
+/// Filter tipe hasil pencarian; `null` berarti semua jenis.
 const List<({String? id, String label})> kSearchFilters =
     <({String? id, String label})>[
   (id: null, label: 'Semua'),
   (id: 'song', label: 'Lagu'),
   (id: 'video', label: 'Video'),
-  (id: 'album', label: 'Album'),
   (id: 'artist', label: 'Artis'),
+  (id: 'album', label: 'Album'),
   (id: 'playlist', label: 'Playlist'),
 ];
 
@@ -46,6 +44,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _error;
   String _submitted = '';
   List<SearchHistoryItem> _history = const <SearchHistoryItem>[];
+  LocalDatabase? _database;
   SettingsStore? _settings;
 
   @override
@@ -56,7 +55,19 @@ class _SearchScreenState extends State<SearchScreen> {
       _settings?.removeListener(_onSettingsChanged);
       _settings = settings..addListener(_onSettingsChanged);
     }
-    if (_controller.text.isEmpty) _refreshHistory();
+    final database = SonoraScope.of(context).database;
+    if (!identical(database, _database)) {
+      _database = database;
+      _refreshHistory();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -66,19 +77,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _controller.dispose();
     _focus.dispose();
     super.dispose();
-  }
-
-  Future<void> _refreshHistory() async {
-    final LocalDatabase? db = SonoraScope.of(context).database;
-    if (db == null) {
-      if (mounted && _history.isNotEmpty) {
-        setState(() => _history = const <SearchHistoryItem>[]);
-      }
-      return;
-    }
-    final List<SearchHistoryItem> items = await db.getRecentSearches(limit: 8);
-    if (!mounted) return;
-    setState(() => _history = items);
   }
 
   void _onSettingsChanged() {
@@ -91,23 +89,17 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = false;
       _submitted = '';
     });
-    _refreshHistory();
   }
 
   void _onChanged(String value) {
     _debounce?.cancel();
-    if (value.trim().length < 2) {
-      _generation++;
-      setState(() {
-        _sections = null;
-        _error = null;
-        _loading = false;
-        _submitted = '';
-      });
-      _refreshHistory();
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 350), () => _run(value));
+    _generation++;
+    setState(() {
+      _sections = null;
+      _error = null;
+      _loading = false;
+      _submitted = '';
+    });
   }
 
   Future<void> _run(String query) async {
@@ -115,20 +107,18 @@ class _SearchScreenState extends State<SearchScreen> {
     if (trimmed.isEmpty) return;
     final SonoraScope scope = SonoraScope.of(context);
     if (!scope.settings.isConfigured) return;
+    unawaited(
+      _database?.recordSearch(trimmed).then((_) => _refreshHistory()),
+    );
     final int generation = ++_generation;
     setState(() {
       _loading = true;
       _error = null;
       _submitted = trimmed;
     });
-    // Catat riwayat lokal (fitur opsional; kegagalan tidak mengganggu hasil).
-    unawaited(
-      scope.database
-          ?.recordSearch(trimmed, filter: _filter)
-          .catchError((Object _) {}),
-    );
     try {
-      final List<MusicSection> sections = await scope.api.search(trimmed, filter: _filter);
+      final List<MusicSection> sections =
+          await scope.api.search(trimmed, filter: _filter);
       if (!mounted || generation != _generation) return;
       setState(() {
         _sections = sections;
@@ -141,25 +131,6 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     }
-  }
-
-  void _applyHistory(String query) {
-    _debounce?.cancel();
-    _controller.text = query;
-    _controller.selection = TextSelection.collapsed(offset: query.length);
-    _run(query);
-  }
-
-  Future<void> _deleteHistoryItem(String query) async {
-    final LocalDatabase? db = SonoraScope.of(context).database;
-    await db?.deleteSearch(query);
-    await _refreshHistory();
-  }
-
-  Future<void> _clearHistory() async {
-    final LocalDatabase? db = SonoraScope.of(context).database;
-    await db?.clearSearchHistory();
-    await _refreshHistory();
   }
 
   void _selectFilter(String? id) {
@@ -180,6 +151,22 @@ class _SearchScreenState extends State<SearchScreen> {
     });
     _refreshHistory();
     _focus.requestFocus();
+  }
+
+  Future<void> _refreshHistory() async {
+    final items = await _database?.getRecentSearches(limit: 30) ??
+        const <SearchHistoryItem>[];
+    if (mounted) setState(() => _history = items);
+  }
+
+  Future<void> _deleteHistory(String query) async {
+    await _database?.deleteSearch(query);
+    await _refreshHistory();
+  }
+
+  Future<void> _clearHistory() async {
+    await _database?.clearSearchHistory();
+    await _refreshHistory();
   }
 
   String _message(Object error) =>
@@ -206,10 +193,14 @@ class _SearchScreenState extends State<SearchScreen> {
                     textInputAction: TextInputAction.search,
                     onChanged: _onChanged,
                     onSubmitted: _run,
-                    style: context.texts.bodyLarge,
                     decoration: InputDecoration(
-                      hintText: 'Cari lagu, artis, album…',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                       hintText: 'Apa yang ingin kamu dengarkan?',
+                       prefixIcon: _focus.hasFocus
+                           ? IconButton(
+                               icon: const Icon(Icons.arrow_back_rounded),
+                               onPressed: () => _focus.unfocus(),
+                             )
+                           : const Icon(Icons.search_rounded),
                       suffixIcon: _controller.text.isEmpty
                           ? null
                           : IconButton(
@@ -220,19 +211,19 @@ class _SearchScreenState extends State<SearchScreen> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(kRadiusXl)),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: kSpaceMd),
+                      contentPadding: const EdgeInsets.symmetric(vertical: kSpaceSm),
                     ),
                   ),
                 ),
                 SizedBox(
-                  height: 48,
+                  height: 52,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
                     itemCount: kSearchFilters.length,
                     separatorBuilder: (_, _) => const SizedBox(width: kSpaceSm),
                     itemBuilder: (BuildContext context, int index) {
-                      final ({String? id, String label}) option = kSearchFilters[index];
+                      final option = kSearchFilters[index];
                       return Center(
                         child: ChoiceChip(
                           label: Text(option.label),
@@ -267,9 +258,24 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       );
     }
-    if (_loading) return const SkeletonHomeFeed();
+    if (_loading) return const LoadingState(label: 'Mencari\u2026');
     if (_error != null) return ErrorState(message: _error!, onRetry: () => _run(_submitted));
-    if (_sections == null) return _noQueryBody(scope);
+    if (_sections == null) {
+      return ListView(
+        padding: const EdgeInsets.only(bottom: kSpaceXxl),
+        children: <Widget>[
+          _SearchHistory(
+            items: _history,
+            onSelect: (String value) {
+              _controller.text = value;
+              _run(value);
+            },
+            onDelete: _deleteHistory,
+            onClear: _clearHistory,
+          ),
+        ],
+      );
+    }
     final List<MusicSection> visible = _sections!
         .where((MusicSection section) => section.items.isNotEmpty)
         .toList(growable: false);
@@ -277,59 +283,10 @@ class _SearchScreenState extends State<SearchScreen> {
       return EmptyState(
         icon: Icons.search_off_rounded,
         title: 'Tidak ada hasil',
-        message: 'Tidak ditemukan hasil untuk “$_submitted”.',
+        message: 'Tidak ditemukan hasil untuk \u201c$_submitted\u201d.',
       );
     }
     return _SearchResults(sections: visible);
-  }
-
-  /// Keadaan tanpa kueri: riwayat pencarian (bila ada) + dorongan awal.
-  Widget _noQueryBody(SonoraScope scope) {
-    if (_history.isEmpty) {
-      return const EmptyState(
-        icon: Icons.search_rounded,
-        title: 'Cari musik',
-        message: 'Ketik minimal dua huruf untuk mencari lagu, artis, album, atau playlist.',
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.only(bottom: kSpaceXxl),
-      children: <Widget>[
-        SectionHeader(
-          title: 'Riwayat pencarian',
-          trailing: TextButton(
-            onPressed: _clearHistory,
-            child: const Text('Hapus'),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
-          child: Wrap(
-            spacing: kSpaceSm,
-            runSpacing: kSpaceSm,
-            children: <Widget>[
-              for (final SearchHistoryItem item in _history)
-                GestureDetector(
-                  onLongPress: () => _deleteHistoryItem(item.query),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.history_rounded, size: 18),
-                    label: Text(item.query),
-                    onPressed: () => _applyHistory(item.query),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: kSpaceXl),
-        EmptyState(
-          icon: Icons.search_rounded,
-          title: 'Cari musik',
-          message:
-              'Ketik minimal dua huruf, atau ketuk riwayat untuk mencari lagi. '
-              'Tekan lama chip untuk menghapusnya.',
-        ),
-      ],
-    );
   }
 }
 
@@ -366,10 +323,116 @@ class _SearchResults extends StatelessWidget {
             ),
           for (final MusicSection section in shelves) ...<Widget>[
             SectionHeader(title: section.title.isEmpty ? 'Lainnya' : section.title),
-            MusicShelf(items: section.items, onOpen: actions.open),
+            for (final MusicItem item in section.items)
+              _SearchBrowseRow(
+                item: item,
+                onOpen: () => actions.open(item),
+              ),
           ],
         ],
       ),
     );
   }
+}
+
+/// Baris vertikal untuk hasil album, artis, dan playlist yang dapat dibuka.
+class _SearchBrowseRow extends StatelessWidget {
+  const _SearchBrowseRow({required this.item, required this.onOpen});
+
+  final MusicItem item;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final String subtitle = artistOf(item).isNotEmpty
+        ? artistOf(item)
+        : (item.subtitle ?? item.type);
+    return InkWell(
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: kSpaceLg,
+          vertical: kSpaceSm,
+        ),
+        child: Row(
+          children: <Widget>[
+            CoverArt(
+              url: item.thumbnail,
+              size: 56,
+              circle: item.type.toLowerCase() == 'artist',
+              radius: kRadiusSm,
+              icon: item.type.toLowerCase() == 'artist'
+                  ? Icons.person_rounded
+                  : Icons.album_rounded,
+            ),
+            const SizedBox(width: kSpaceMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.texts.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.texts.bodySmall?.copyWith(
+                      color: context.scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchHistory extends StatelessWidget {
+  const _SearchHistory({required this.items, required this.onSelect, required this.onDelete, required this.onClear});
+  final List<SearchHistoryItem> items;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onDelete;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: kSpaceXxl),
+        child: Column(
+          children: <Widget>[
+          SectionHeader(
+            title: 'Riwayat pencarian',
+            trailing: items.isEmpty
+                ? null
+                : TextButton(onPressed: onClear, child: const Text('Hapus semua')),
+          ),
+          if (items.isEmpty)
+            const EmptyState(
+              icon: Icons.search_rounded,
+              title: 'Belum ada pencarian',
+              message: 'Pencarian lagu, album, artis, atau playlist akan muncul di sini.',
+            ),
+          for (final item in items)
+            ListTile(
+              leading: const Icon(Icons.history_rounded),
+              title: Text(item.query, style: context.texts.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+              trailing: IconButton(
+                tooltip: 'Hapus',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => onDelete(item.query),
+              ),
+              onTap: () => onSelect(item.query),
+            ),
+          ],
+        ),
+      );
 }

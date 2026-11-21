@@ -17,6 +17,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../data/music_models.dart';
+import '../../data/local_database.dart';
 import '../../playback/sonora_audio_handler.dart';
 
 /// Satu lagu di antrean UI.
@@ -113,7 +114,7 @@ class PlayerSnapshot {
 
 /// Pengendali pemutar yang dapat diamati.
 class PlayerController extends ChangeNotifier {
-  PlayerController(this._handler) {
+  PlayerController(this._handler, {this._database}) {
     _queueSub = _handler.queue.listen(_onQueue);
     _mediaItemSub = _handler.mediaItem.listen(_onMediaItem);
     _stateSub = _handler.playbackState.listen(_onPlaybackState);
@@ -122,6 +123,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   final SonoraAudioHandler _handler;
+  final LocalDatabase? _database;
 
   StreamSubscription<List<MediaItem>>? _queueSub;
   StreamSubscription<MediaItem?>? _mediaItemSub;
@@ -378,8 +380,12 @@ class PlayerController extends ChangeNotifier {
 
   void _onMediaItem(MediaItem? item) {
     if (_disposed) return;
+    final previousId = _current?.id;
     _current = item;
     _duration = item?.duration ?? Duration.zero;
+    if (item != null && item.id != previousId) {
+      unawaited(_database?.recordPlayback(_fromMediaItem(item)) ?? Future<void>.value());
+    }
     _publish(_compose());
   }
 
