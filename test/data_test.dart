@@ -297,6 +297,24 @@ void main() {
       reloaded.dispose();
     });
 
+    test('proxyDraft mempertahankan nilai draf ketika dinonaktifkan', () async {
+      final store = await _store('https://host:8787');
+      expect(store.proxyDraft, 'https://host:8787');
+
+      // Matikan konfigurasi (mis. toggle Add-on dimatikan).
+      await store.setProxyBase('');
+      expect(store.proxyBase, '');
+      expect(store.isConfigured, isFalse);
+      // Draf tetap utuh.
+      expect(store.proxyDraft, 'https://host:8787');
+
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.proxyBase, '');
+      expect(reloaded.proxyDraft, 'https://host:8787');
+      store.dispose();
+      reloaded.dispose();
+    });
+
     test('nilai korup (bukan string) menjadi default', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'sonora.proxyBase': 123,

@@ -22,9 +22,10 @@ class SettingsPersistenceException implements Exception {
 
 /// Menyimpan dan mengamati base URL proxy.
 class SettingsStore extends ChangeNotifier {
-  SettingsStore._(this._preferences, this._proxyBase);
+  SettingsStore._(this._preferences, this._proxyBase, this._proxyDraft);
 
   static const String _proxyBaseKey = 'sonora.proxyBase';
+  static const String _proxyDraftKey = 'sonora.proxyDraft';
 
   /// Default opsional dari build (`--dart-define=SONORA_PROXY_URL=...`).
   static const String _environmentDefault =
@@ -32,9 +33,13 @@ class SettingsStore extends ChangeNotifier {
 
   final SharedPreferences _preferences;
   String _proxyBase;
+  String _proxyDraft;
 
   /// Base URL proxy aktif (tanpa slash ujung). Bisa kosong.
   String get proxyBase => _proxyBase;
+
+  /// Draf URL proxy terakhir yang tersimpan saat switch dinonaktifkan.
+  String get proxyDraft => _proxyDraft;
 
   /// `true` bila base URL sudah diisi.
   bool get isConfigured => _proxyBase.isNotEmpty;
@@ -58,7 +63,15 @@ class SettingsStore extends ChangeNotifier {
       proxyBase = '';
     }
 
-    return SettingsStore._(prefs, proxyBase);
+    final storedDraft = prefs.get(_proxyDraftKey);
+    final String proxyDraft;
+    if (storedDraft is String && storedDraft.isNotEmpty) {
+      proxyDraft = _normalizeOrEmpty(storedDraft);
+    } else {
+      proxyDraft = proxyBase;
+    }
+
+    return SettingsStore._(prefs, proxyBase, proxyDraft);
   }
 
   /// Menyimpan base URL proxy. String kosong menghapus konfigurasi.
@@ -75,7 +88,20 @@ class SettingsStore extends ChangeNotifier {
         'Gagal menyimpan alamat proxy. Perubahan tidak diterapkan.',
       );
     }
+    if (normalized.isNotEmpty) {
+      _proxyDraft = normalized;
+      await _preferences.setString(_proxyDraftKey, normalized);
+    }
     _proxyBase = normalized;
+    notifyListeners();
+  }
+
+  /// Menyimpan draf URL proxy tanpa mengaktifkannya secara langsung.
+  Future<void> setProxyDraft(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return;
+    _proxyDraft = trimmed;
+    await _preferences.setString(_proxyDraftKey, trimmed);
     notifyListeners();
   }
 

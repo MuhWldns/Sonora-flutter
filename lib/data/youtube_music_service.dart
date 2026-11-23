@@ -17,7 +17,7 @@ class _CachedStream {
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }
 
-/// Layanan mandiri YouTube Music ala BitChord.
+/// Layanan mandiri YouTube Music langsung dari klien.
 ///
 /// Berjalan langsung dari perangkat klien tanpa membutuhkan proxy server VPS.
 /// Mengambil stream audio dengan bitrate tertinggi langsung dari CDN YouTube

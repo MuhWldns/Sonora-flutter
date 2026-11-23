@@ -23,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _controller = TextEditingController();
   SettingsStore? _settings;
+  bool _addonEnabled = false;
   bool _saving = false;
   String? _saveError;
   _TestState _test = _TestState.idle;
@@ -58,7 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!identical(settings, _settings)) {
       _settings?.removeListener(_onSettingsChanged);
       _settings = settings..addListener(_onSettingsChanged);
-      _controller.text = settings.proxyBase;
+      _addonEnabled = settings.isConfigured;
+      _controller.text =
+          settings.isConfigured ? settings.proxyBase : settings.proxyDraft;
     }
   }
 
@@ -73,10 +76,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     // Sinkronkan bidang bila nilai berubah dari tempat lain.
     final String current = _settings!.proxyBase;
-    if (_controller.text.trim() != current) {
-      _controller.text = current;
+    if (current.isNotEmpty) {
+      _addonEnabled = true;
+      if (_controller.text.trim() != current) {
+        _controller.text = current;
+      }
     }
     setState(() {});
+  }
+
+  Future<void> _onToggleAddon(bool enabled) async {
+    final SonoraScope scope = SonoraScope.of(context);
+    setState(() {
+      _addonEnabled = enabled;
+      _saveError = null;
+      _test = _TestState.idle;
+      _testMessage = null;
+    });
+
+    if (!enabled) {
+      final String text = _controller.text.trim();
+      if (text.isNotEmpty) {
+        await scope.settings.setProxyDraft(text);
+      }
+      if (scope.settings.isConfigured) {
+        await scope.settings.setProxyBase('');
+        await scope.player.stop();
+        if (mounted) {
+          showSonoraSnack(
+            context,
+            'Add-on dinonaktifkan. Mode mandiri aktif.',
+            success: true,
+          );
+        }
+      }
+    } else {
+      if (_controller.text.trim().isEmpty &&
+          scope.settings.proxyDraft.isNotEmpty) {
+        _controller.text = scope.settings.proxyDraft;
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -173,74 +212,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Server proxy (Opsional)', style: context.texts.titleMedium),
+                        Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.extension_rounded,
+                              size: 22,
+                              color: scheme.primary,
+                            ),
+                            const SizedBox(width: kSpaceSm),
+                            Text('Add-ons', style: context.texts.titleMedium),
+                          ],
+                        ),
                         const SizedBox(height: kSpaceXs),
                         Text(
-                          'Alamat proxy Sonora (opsional). '
-                          'Jika dikosongkan, pemutaran dan pencarian musik berjalan '
-                          'langsung secara mandiri dari perangkat ala BitChord.',
+                          'Ekstensi dan integrasi server tambahan. '
+                          'Bila dinonaktifkan, seluruh pemutaran dan pencarian berjalan '
+                          '100% mandiri langsung dari perangkat.',
                           style: context.texts.bodyMedium
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
-                        const SizedBox(height: kSpaceLg),
-                  TextField(
-                    controller: _controller,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _save(),
-                    onChanged: (_) {
-                      if (_test != _TestState.idle) {
-                        setState(() {
-                          _test = _TestState.idle;
-                          _testMessage = null;
-                        });
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      hintText: 'https://host:8787',
-                      prefixIcon: Icon(Icons.link_rounded),
-                    ),
-                  ),
-                  if (_saveError != null) ...<Widget>[
-                    const SizedBox(height: kSpaceSm),
-                    _Banner(
-                      icon: Icons.error_outline_rounded,
-                      color: scheme.error,
-                      background: scheme.errorContainer,
-                      text: _saveError!,
-                    ),
-                  ],
-                  const SizedBox(height: kSpaceLg),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2.2),
-                                )
-                              : const Icon(Icons.save_rounded),
-                          label: const Text('Simpan'),
+                        const SizedBox(height: kSpaceMd),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(kRadiusMd),
+                          ),
+                          child: SwitchListTile.adaptive(
+                            value: _addonEnabled,
+                            onChanged: _saving ? null : _onToggleAddon,
+                            activeTrackColor: scheme.primary,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: kSpaceMd,
+                              vertical: kSpaceXs,
+                            ),
+                            title: Text(
+                              'Sonora Node Proxy',
+                              style: context.texts.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              _addonEnabled
+                                  ? (scope.settings.isConfigured
+                                      ? 'Aktif — terhubung ke proxy pribadi'
+                                      : 'Menunggu simpan alamat URL')
+                                  : 'Dinonaktifkan (Mode Mandiri Aktif)',
+                              style: context.texts.bodySmall?.copyWith(
+                                color: _addonEnabled
+                                    ? (scope.settings.isConfigured
+                                        ? context.sonora.success
+                                        : scheme.onSurfaceVariant)
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: kSpaceMd),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed:
-                              _test == _TestState.testing ? null : _testConnection,
-                          icon: const Icon(Icons.wifi_tethering_rounded),
-                          label: const Text('Tes koneksi'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: kSpaceMd),
-                  _testStatus(scope),
+                        if (_addonEnabled) ...<Widget>[
+                          const SizedBox(height: kSpaceLg),
+                          Text(
+                            'Alamat Server Proxy',
+                            style: context.texts.labelMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: kSpaceXs),
+                          TextField(
+                            controller: _controller,
+                            keyboardType: TextInputType.url,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _save(),
+                            onChanged: (_) {
+                              if (_test != _TestState.idle) {
+                                setState(() {
+                                  _test = _TestState.idle;
+                                  _testMessage = null;
+                                });
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              hintText: 'https://host:8787',
+                              prefixIcon: Icon(Icons.link_rounded),
+                            ),
+                          ),
+                          if (_saveError != null) ...<Widget>[
+                            const SizedBox(height: kSpaceSm),
+                            _Banner(
+                              icon: Icons.error_outline_rounded,
+                              color: scheme.error,
+                              background: scheme.errorContainer,
+                              text: _saveError!,
+                            ),
+                          ],
+                          const SizedBox(height: kSpaceLg),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: _saving ? null : _save,
+                                  icon: _saving
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                                        )
+                                      : const Icon(Icons.save_rounded),
+                                  label: const Text('Simpan'),
+                                ),
+                              ),
+                              const SizedBox(width: kSpaceMd),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed:
+                                      _test == _TestState.testing ? null : _testConnection,
+                                  icon: const Icon(Icons.wifi_tethering_rounded),
+                                  label: const Text('Tes koneksi'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: kSpaceMd),
+                          _testStatus(scope),
+                        ],
                       ],
                     ),
                   ),
@@ -333,15 +427,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text('Status', style: context.texts.titleMedium),
                   const SizedBox(height: kSpaceSm),
                   _StatusRow(
-                    label: 'Endpoint',
+                    label: 'Add-on Proxy',
                     value: scope.settings.isConfigured
                         ? scope.settings.proxyBase
-                        : 'Belum diatur',
+                        : 'Dinonaktifkan (Mode Mandiri)',
                     ok: scope.settings.isConfigured,
                   ),
                   const SizedBox(height: kSpaceXl),
                   Text(
-                    'Direct Stream YouTube (Bitrate Tertinggi) • Standalone ala BitChord',
+                    'Direct Stream YouTube (Bitrate Tertinggi) • Mode Mandiri',
                     style: context.texts.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant),
                     textAlign: TextAlign.center,

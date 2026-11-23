@@ -28,8 +28,8 @@ import '../data/youtube_music_service.dart';
 /// swallow [PlayerInterruptedException] (expected when a newer request
 /// supersedes an in-flight one) but never let other failures escape unhandled.
 class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
-  SonoraAudioHandler(
-    this._api, {
+  SonoraAudioHandler({
+    SonoraApi? api,
     YouTubeMusicService? ytService,
   })  : _yt = ytService ?? YouTubeMusicService(),
         _player = AudioPlayer() {
@@ -40,7 +40,6 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     _errorSub = _player.errorStream.listen(_onPlayerError);
   }
 
-  final SonoraApi _api;
   final YouTubeMusicService _yt;
   final AudioPlayer _player;
 
@@ -95,7 +94,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
     final handler = await AudioService.init<SonoraAudioHandler>(
-      builder: () => SonoraAudioHandler(api, ytService: ytService),
+      builder: () => SonoraAudioHandler(api: api, ytService: ytService),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.sonora_flutter.playback',
         androidNotificationChannelName: 'Sonora playback',
@@ -194,8 +193,14 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
       if (uri == null) {
         throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
       }
-      // ignore: experimental_member_use
-      return LockCachingAudioSource(uri, tag: item);
+      return AudioSource.uri(
+        uri,
+        tag: item,
+        headers: const <String, String>{
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      );
     });
 
     final sources = await Future.wait(futures);
@@ -378,11 +383,9 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   MediaItem? _mediaItemFor(IndexedAudioSource? source) {
     final item = source?.tag;
     if (item is! MusicItem || item.videoId == null) return null;
-    // Prefer the URI captured when the queue was built so a later proxy change
-    // cannot rewrite the identity of an already-queued track.
-    final id = source is UriAudioSource
-        ? source.uri.toString()
-        : _api.streamUri(item.videoId!).toString();
+    // Canonical track identity is its videoId, decoupling player queue from
+    // external proxy configuration.
+    final id = item.videoId!;
     final thumbnail = item.thumbnail;
     return MediaItem(
       id: id,
