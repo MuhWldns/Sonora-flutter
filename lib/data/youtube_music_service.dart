@@ -47,14 +47,27 @@ class YouTubeMusicService {
     try {
       final StreamManifest manifest =
           await _yt.videos.streamsClient.getManifest(videoId);
-      // Prioritaskan stream audio murni berkualitas tinggi (manifest.audioOnly)
-      // seperti AAC (itag 140) atau Opus (itag 251) dengan bitrate 128-160 kbps.
-      // Stream murni ini jauh lebih hemat kuota (~3.4 MB vs ~11.8 MB video muxed),
-      // tidak membebani pemutar audio dengan demuxing video tak terpakai, dan menghasilkan
-      // suara jernih tanpa distorsi. Fallback ke muxed jika audioOnly tidak tersedia.
-      final StreamInfo stream = manifest.audioOnly.isNotEmpty
-          ? manifest.audioOnly.withHighestBitrate()
-          : manifest.muxed.withHighestBitrate();
+      // Hierarki prioritas format audio:
+      // 1. Prioritaskan AAC/M4A (itag 140 / mp4) untuk kompatibilitas durasi dan seeking presisi di Android Media3.
+      // 2. Fallback ke audioOnly bitrate tertinggi (misal Opus/WebM itag 251, ~160 kbps).
+      // 3. Fallback terakhir ke muxed MP4 jika audioOnly kosong sama sekali.
+      AudioStreamInfo? chosenAudio;
+      final Iterable<AudioStreamInfo> aacStreams = manifest.audioOnly.where(
+        (AudioStreamInfo s) =>
+            s.container.name.toLowerCase() == 'mp4' ||
+            s.audioCodec.toLowerCase().contains('mp4a') ||
+            s.tag == 140,
+      );
+      if (aacStreams.isNotEmpty) {
+        chosenAudio = aacStreams.withHighestBitrate();
+      } else if (manifest.audioOnly.isNotEmpty) {
+        chosenAudio = manifest.audioOnly.withHighestBitrate();
+      }
+
+      final StreamInfo stream = chosenAudio ??
+          (manifest.muxed.isNotEmpty
+              ? manifest.muxed.withHighestBitrate()
+              : manifest.streams.first);
 
       final Uri uri = stream.url;
       _streamCache[videoId] = _CachedStream(

@@ -131,7 +131,8 @@ lib/
 │   ├── settings_store.dart       # Persistensi URL proxy (SharedPreferences)
 │   ├── sonora_api.dart           # Klien HTTP untuk proxy Sonora
 │   ├── lyrics_store.dart         # Klien LRCLIB dan parser LRC (lirik tersinkronisasi)
-│   └── local_database.dart       # SQLite lokal: history, favorites, searches
+│   ├── audio_cache_service.dart  # Pengelola disk cache audio & kalkulasi penyimpanan lokal
+│   └── local_database.dart       # SQLite lokal: history, favorites, searches, playlists, collections, stats
 ├── playback/
 │   └── sonora_audio_handler.dart # AudioHandler, notifikasi native, pemutaran latar belakang
 └── ui/

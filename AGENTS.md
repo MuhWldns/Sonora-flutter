@@ -7,7 +7,7 @@ Flutter music-player client with standalone-first direct YouTube playback (BitCh
 ```sh
 flutter pub get
 flutter analyze                          # must stay at 0 issues
-flutter test                             # 31 tests; no special flags needed
+flutter test                             # 33 tests; no special flags needed
 flutter run [--dart-define=SONORA_PROXY_URL=https://host]   # Android is the primary target
 flutter build apk --debug
 ```
@@ -19,7 +19,7 @@ Flutter 3.44+ / Dart ^3.12.2. Windows dev host with cross-drive (C:/D:) layout.
 ```
 lib/
 ├── main.dart        # bootstrap: SettingsStore → SonoraApi → YouTubeMusicService → SonoraAudioHandler → LocalDatabase? → SonoraApp
-├── data/            # music_models, settings_store, sonora_api, lyrics_store, local_database, youtube_music_service
+├── data/            # music_models, settings_store, sonora_api, lyrics_store, local_database, youtube_music_service, audio_cache_service
 ├── playback/        # sonora_audio_handler only
 └── ui/              # sonora_app, app_scope, root_shell, theme, player_actions,
                      # player/ (controller + chrome), screens/ (home, search, browse, library, settings), widgets/
@@ -33,7 +33,8 @@ lib/
 
 ## Data-layer invariants
 
-- `YouTubeMusicService`: client-side YouTube extractor (`youtube_explode_dart`); stream resolution prioritizes `manifest.muxed.withHighestBitrate()` (MP4 container with AAC audio track) to bypass GoogleVideo's HTTP 403 anti-scraping block on Android ExoPlayer open-ended range requests; caches resolved stream URIs for 4 hours; provides standalone search and trending feeds without proxy server dependency.
+- `YouTubeMusicService`: client-side YouTube extractor (`youtube_explode_dart`); stream resolution prioritizes AAC/M4A streams (itag 140 / `mp4a.40.2`) for rock-solid Android Media3 ExoPlayer seeking and duration precision, fallbacks to high-bitrate Opus/WebM (itag 251), and last-resort muxed MP4 safety net; caches resolved stream URIs for 4 hours; provides standalone search and trending feeds without proxy server dependency.
+- `AudioCacheService`: disk cache manager for `just_audio_cache` under `getTemporaryDirectory()`; computes real-time cache consumption and provides safe asynchronous cache clearing.
 - `SettingsStore`: SharedPreferences key `sonora.proxyBase`. "Cleared" state is stored as an **empty string, not key deletion** (deliberate — the `--dart-define=SONORA_PROXY_URL` default must not resurrect). Persist-first: write must succeed before notify.
 - `SonoraApi`: injectable `http.Client`; base URL captured synchronously at request start (mid-flight proxy changes don't redirect it); preserves a base path prefix; 20 s timeout; decodes response bodies from UTF-8 **bytes** (latin1 default corrupts text). Error messages are fixed Indonesian strings — never leak server bodies/hosts/URLs into exceptions surfaced to UI.
 - `MusicItem`: `isPlayable` requires non-empty `videoId`; `browseTarget` normalizes playlist IDs to canonical `VL…` prefix. Navigation and playback gating both rely on this.

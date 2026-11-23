@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+import 'package:sonora_flutter/data/audio_cache_service.dart';
 import 'package:sonora_flutter/data/music_models.dart';
 import 'package:sonora_flutter/data/settings_store.dart';
 import 'package:sonora_flutter/data/sonora_api.dart';
@@ -597,6 +598,26 @@ void main() {
       // Setelah dispose, pemanggilan tetap aman dan mengembalikan fallback
       expect(await service.resolveStreamUri('test'), isNull);
       expect(await service.search('test'), isEmpty);
+    });
+  });
+
+  group('AudioCacheService', () {
+    test('formatBytes memformat ukuran byte dengan benar', () {
+      expect(AudioCacheService.formatBytes(0), '0 B');
+      expect(AudioCacheService.formatBytes(-50), '0 B');
+      expect(AudioCacheService.formatBytes(512), '512 B');
+      expect(AudioCacheService.formatBytes(1024), '1.0 KB');
+      expect(AudioCacheService.formatBytes(1048576), '1.0 MB');
+      expect(AudioCacheService.formatBytes(1572864), '1.5 MB');
+      expect(AudioCacheService.formatBytes(1073741824), '1.0 GB');
+    });
+
+    test('getCacheSizeBytes dan clearCache aman dipanggil', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final bytes = await AudioCacheService.getCacheSizeBytes();
+      expect(bytes, isNonNegative);
+      await AudioCacheService.clearCache();
+      expect(await AudioCacheService.getCacheSizeBytes(), isNonNegative);
     });
   });
 }

@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../data/audio_cache_service.dart';
 import '../../data/settings_store.dart';
 import '../../data/sonora_api.dart';
 import '../app_scope.dart';
@@ -26,6 +27,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _saveError;
   _TestState _test = _TestState.idle;
   String? _testMessage;
+  int _cacheBytes = 0;
+  bool _clearingCache = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCacheSize();
+  }
+
+  Future<void> _loadCacheSize() async {
+    final int bytes = await AudioCacheService.getCacheSizeBytes();
+    if (!mounted) return;
+    setState(() => _cacheBytes = bytes);
+  }
+
+  Future<void> _clearCache() async {
+    setState(() => _clearingCache = true);
+    await AudioCacheService.clearCache();
+    await _loadCacheSize();
+    if (!mounted) return;
+    setState(() => _clearingCache = false);
+    showSonoraSnack(context, 'Cache audio berhasil dibersihkan.', success: true);
+  }
 
   @override
   void didChangeDependencies() {
@@ -217,6 +241,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: kSpaceMd),
                   _testStatus(scope),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: kSpaceXl),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(kSpaceLg),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(kRadiusLg),
+                      border: Border.all(color: scheme.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Icon(Icons.cached_rounded, size: 22, color: scheme.primary),
+                            const SizedBox(width: kSpaceSm),
+                            Text('Penyimpanan & Cache Audio', style: context.texts.titleMedium),
+                          ],
+                        ),
+                        const SizedBox(height: kSpaceXs),
+                        Text(
+                          'Berkas stream audio yang telah di-cache ke memori perangkat agar dapat diputar mulus tanpa jeda buffer.',
+                          style: context.texts.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: kSpaceLg),
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    'Ukuran Cache Saat Ini',
+                                    style: context.texts.labelSmall
+                                        ?.copyWith(color: scheme.onSurfaceVariant),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    AudioCacheService.formatBytes(_cacheBytes),
+                                    style: context.texts.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: scheme.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _clearingCache ? null : _clearCache,
+                              icon: _clearingCache
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.delete_outline_rounded, size: 20),
+                              label: const Text('Bersihkan'),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
