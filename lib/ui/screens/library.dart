@@ -418,7 +418,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 }
 
-/// Tampilan statistik mendengarkan pengguna.
+/// Tampilan statistik mendengarkan pengguna dengan desain kartu estetik (Nocturne Audio).
 class _StatsView extends StatelessWidget {
   const _StatsView({
     required this.period,
@@ -431,6 +431,27 @@ class _StatsView extends StatelessWidget {
   final ListeningStats? stats;
   final bool loading;
   final ValueChanged<_StatsPeriod> onPeriodChanged;
+
+  String _formatMinutes(int minutes) {
+    if (minutes >= 60) {
+      final hours = minutes ~/ 60;
+      final remaining = minutes % 60;
+      if (remaining == 0) return '$hours Jam';
+      return '$hours Jam $remaining Mnt';
+    }
+    return '$minutes Menit';
+  }
+
+  void _playTrack(BuildContext context, TopTrackStat track) {
+    final item = MusicItem(
+      type: 'song',
+      title: track.title,
+      artist: track.artist,
+      thumbnail: track.thumbnail,
+      videoId: track.videoId,
+    );
+    PlayerActions.of(context).play(item);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -476,221 +497,395 @@ class _StatsView extends StatelessWidget {
                   'Dengarkan lagu favoritmu minimal 15 detik untuk mulai mencatat wawasan musik riil.',
             )
           else ...<Widget>[
-            // Kartu Ringkasan
+            // Hero Card: Waktu Mendengarkan
             GlassContainer(
               padding: const EdgeInsets.all(kSpaceLg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    'Wawasan Mendengarkan (${period.label})',
-                    style: context.texts.titleMedium?.copyWith(
-                      color: sonora.accentText,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: kSpaceMd),
                   Row(
                     children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              '${stats!.totalMinutes}',
-                              style: context.texts.displayMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: scheme.primary,
-                              ),
-                            ),
-                            Text(
-                              'Total Menit',
-                              style: context.texts.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                      Container(
+                        padding: const EdgeInsets.all(kSpaceSm),
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.headphones_rounded,
+                          size: 20,
+                          color: scheme.primary,
                         ),
                       ),
-                      Container(
-                        height: 48,
-                        width: 1,
-                        color: scheme.outlineVariant,
+                      const SizedBox(width: kSpaceSm),
+                      Text(
+                        'Total Waktu Mendengarkan',
+                        style: context.texts.labelLarge?.copyWith(
+                          color: sonora.accentText,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(width: kSpaceLg),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: kSpaceSm,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(kRadiusXl),
+                        ),
+                        child: Text(
+                          period.label,
+                          style: context.texts.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: kSpaceLg),
+                  Text(
+                    _formatMinutes(stats!.totalMinutes),
+                    style: context.texts.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: scheme.primary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Akumulasi durasi pemutaran riil (min. 15 detik)',
+                    style: context.texts.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: kSpaceMd),
+
+            // Bento Metric Row: Total Plays & Lagu Unik
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: GlassContainer(
+                    padding: const EdgeInsets.all(kSpaceMd),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Icon(
+                          Icons.play_circle_fill_rounded,
+                          size: 24,
+                          color: scheme.onSurface,
+                        ),
+                        const SizedBox(height: kSpaceSm),
+                        Text(
+                          '${stats!.totalPlays}',
+                          style: context.texts.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          'Lagu Diputar',
+                          style: context.texts.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: kSpaceMd),
+                Expanded(
+                  child: GlassContainer(
+                    padding: const EdgeInsets.all(kSpaceMd),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Icon(
+                          Icons.audiotrack_rounded,
+                          size: 24,
+                          color: sonora.accentText,
+                        ),
+                        const SizedBox(height: kSpaceSm),
+                        Text(
+                          '${stats!.topTracks.length}',
+                          style: context.texts.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          'Lagu Favorit Teratas',
+                          style: context.texts.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Top Lagu: Spotlight #1 + Grouped Card #2-#5
+            if (stats!.topTracks.isNotEmpty) ...<Widget>[
+              const SizedBox(height: kSpaceXl),
+              const SectionHeader(title: 'Lagu Paling Sering Diputar'),
+              const SizedBox(height: kSpaceSm),
+              // Spotlight Card untuk Lagu #1
+              () {
+                final top1 = stats!.topTracks.first;
+                return GlassContainer(
+                  padding: const EdgeInsets.all(kSpaceMd),
+                  child: Column(
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: kSpaceSm,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(kRadiusXl),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                const Text('👑 ', style: TextStyle(fontSize: 12)),
+                                Text(
+                                  '#1 Teratas',
+                                  style: context.texts.labelSmall?.copyWith(
+                                    color: scheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${top1.playCount}x putar • ${top1.totalMinutes} mnt',
+                            style: context.texts.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: kSpaceMd),
+                      InkWell(
+                        onTap: () => _playTrack(context, top1),
+                        borderRadius: BorderRadius.circular(kRadiusSm),
+                        child: Row(
                           children: <Widget>[
-                            Text(
-                              '${stats!.totalPlays}',
-                              style: context.texts.displayMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: scheme.onSurface,
+                            CoverArt(
+                              url: top1.thumbnail,
+                              size: 56,
+                              radius: kRadiusSm,
+                            ),
+                            const SizedBox(width: kSpaceMd),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    top1.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.texts.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    top1.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.texts.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Text(
-                              'Lagu Diputar',
-                              style: context.texts.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
+                            IconButton.filled(
+                              onPressed: () => _playTrack(context, top1),
+                              icon: const Icon(Icons.play_arrow_rounded, size: 24),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: kSpaceXl),
+                );
+              }(),
 
-            // Top Lagu
-            if (stats!.topTracks.isNotEmpty) ...<Widget>[
-              const SectionHeader(title: 'Lagu Paling Sering Diputar'),
-              const SizedBox(height: kSpaceSm),
-              for (final (index, track) in stats!.topTracks.indexed)
-                InkWell(
-                  onTap: () {
-                    final item = MusicItem(
-                      type: 'song',
-                      title: track.title,
-                      artist: track.artist,
-                      thumbnail: track.thumbnail,
-                      videoId: track.videoId,
-                    );
-                    PlayerActions.of(context).play(item);
-                  },
-                  borderRadius: BorderRadius.circular(kRadiusMd),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: kSpaceSm,
-                      horizontal: kSpaceSm,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        SizedBox(
-                          width: 28,
-                          child: Text(
-                            '#${index + 1}',
-                            style: context.texts.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: index == 0
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant,
+              // Grouped Card untuk Lagu #2 dst.
+              if (stats!.topTracks.length > 1) ...<Widget>[
+                const SizedBox(height: kSpaceMd),
+                GlassContainer(
+                  padding: const EdgeInsets.symmetric(vertical: kSpaceSm),
+                  child: Column(
+                    children: <Widget>[
+                      for (final (index, track) in stats!.topTracks.skip(1).indexed) ...<Widget>[
+                        if (index > 0)
+                          Divider(
+                            height: 1,
+                            indent: 56,
+                            color: scheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                        InkWell(
+                          onTap: () => _playTrack(context, track),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: kSpaceSm,
+                              horizontal: kSpaceMd,
+                            ),
+                            child: Row(
+                              children: <Widget>[
+                                SizedBox(
+                                  width: 24,
+                                  child: Text(
+                                    '#${index + 2}',
+                                    style: context.texts.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                CoverArt(url: track.thumbnail, size: 44),
+                                const SizedBox(width: kSpaceMd),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        track.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: context.texts.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        track.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: context.texts.bodySmall?.copyWith(
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: <Widget>[
+                                    Text(
+                                      '${track.playCount}x',
+                                      style: context.texts.labelLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: sonora.accentText,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${track.totalMinutes} mnt',
+                                      style: context.texts.labelSmall?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        CoverArt(url: track.thumbnail, size: 48),
-                        const SizedBox(width: kSpaceMd),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                track.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.texts.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.texts.bodySmall?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+
+            // Top Artis: Carousel Horizontal Cards
+            if (stats!.topArtists.isNotEmpty) ...<Widget>[
+              const SizedBox(height: kSpaceXl),
+              const SectionHeader(title: 'Artis Teratas'),
+              const SizedBox(height: kSpaceSm),
+              SizedBox(
+                height: 144,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: stats!.topArtists.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: kSpaceMd),
+                  itemBuilder: (context, index) {
+                    final artist = stats!.topArtists[index];
+                    final isTop = index == 0;
+                    return SizedBox(
+                      width: 140,
+                      child: GlassContainer(
+                        padding: const EdgeInsets.all(kSpaceMd),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: <Widget>[
+                                CircleAvatar(
+                                  radius: 26,
+                                  backgroundColor: isTop
+                                      ? scheme.primary.withValues(alpha: 0.2)
+                                      : scheme.surfaceContainerHighest,
+                                  child: Icon(
+                                    Icons.person_rounded,
+                                    size: 30,
+                                    color: isTop ? scheme.primary : scheme.onSurface,
+                                  ),
+                                ),
+                                if (isTop)
+                                  Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: scheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Text('👑', style: TextStyle(fontSize: 10)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: kSpaceSm),
                             Text(
-                              '${track.playCount}x',
+                              artist.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                               style: context.texts.labelLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: sonora.accentText,
                               ),
                             ),
+                            const SizedBox(height: 2),
                             Text(
-                              '${track.totalMinutes} mnt',
+                              '${artist.playCount}x • ${artist.totalMinutes} mnt',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                               style: context.texts.labelSmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              const SizedBox(height: kSpaceXl),
-            ],
-
-            // Top Artis
-            if (stats!.topArtists.isNotEmpty) ...<Widget>[
-              const SectionHeader(title: 'Artis Teratas'),
-              const SizedBox(height: kSpaceSm),
-              for (final (index, artist) in stats!.topArtists.indexed)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: kSpaceSm,
-                    horizontal: kSpaceSm,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          '#${index + 1}',
-                          style: context.texts.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: index == 0
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const CircleAvatar(
-                        radius: 20,
-                        child: Icon(Icons.person_rounded),
-                      ),
-                      const SizedBox(width: kSpaceMd),
-                      Expanded(
-                        child: Text(
-                          artist.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.texts.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: <Widget>[
-                          Text(
-                            '${artist.playCount}x putar',
-                            style: context.texts.labelLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: sonora.accentText,
-                            ),
-                          ),
-                          Text(
-                            '${artist.totalMinutes} mnt',
-                            style: context.texts.labelSmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              ),
             ],
             const SizedBox(height: kSpaceXxl),
           ],

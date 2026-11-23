@@ -193,7 +193,8 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
       if (uri == null) {
         throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
       }
-      return AudioSource.uri(uri, tag: item);
+      // ignore: experimental_member_use
+      return LockCachingAudioSource(uri, tag: item);
     });
 
     final sources = await Future.wait(futures);

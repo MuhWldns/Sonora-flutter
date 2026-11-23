@@ -47,12 +47,14 @@ class YouTubeMusicService {
     try {
       final StreamManifest manifest =
           await _yt.videos.streamsClient.getManifest(videoId);
-      // Prioritaskan stream muxed (kontainer MP4 dengan track AAC mp4a.40.2)
-      // karena YouTube tidak memblokir range request ExoPlayer (bebas 403 / PO token limit).
-      // Fallback ke audioOnly jika muxed tidak tersedia.
-      final StreamInfo stream = manifest.muxed.isNotEmpty
-          ? manifest.muxed.withHighestBitrate()
-          : manifest.audioOnly.withHighestBitrate();
+      // Prioritaskan stream audio murni berkualitas tinggi (manifest.audioOnly)
+      // seperti AAC (itag 140) atau Opus (itag 251) dengan bitrate 128-160 kbps.
+      // Stream murni ini jauh lebih hemat kuota (~3.4 MB vs ~11.8 MB video muxed),
+      // tidak membebani pemutar audio dengan demuxing video tak terpakai, dan menghasilkan
+      // suara jernih tanpa distorsi. Fallback ke muxed jika audioOnly tidak tersedia.
+      final StreamInfo stream = manifest.audioOnly.isNotEmpty
+          ? manifest.audioOnly.withHighestBitrate()
+          : manifest.muxed.withHighestBitrate();
 
       final Uri uri = stream.url;
       _streamCache[videoId] = _CachedStream(
