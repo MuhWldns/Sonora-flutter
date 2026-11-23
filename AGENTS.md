@@ -1,13 +1,13 @@
 # AGENTS.md — Sonora Flutter
 
-Flutter music-player client for the self-hosted **Sonora Node proxy** ([Sonora-Music](https://github.com/MuhWldns/Sonora-Music)). The app never talks to YouTube/InnerTube directly and holds no secrets — all deciphering/PO-token work happens server-side. The app just calls `/home`, `/search`, `/browse`, `/healthz` and streams from `/stream?videoId=`.
+Flutter music-player client with standalone-first direct YouTube playback (BitChord-inspired) and optional self-hosted **Sonora Node proxy** ([Sonora-Music](https://github.com/MuhWldns/Sonora-Music)) support. Streams directly from GoogleVideo CDN without requiring an external proxy or server secrets.
 
 ## Commands
 
 ```sh
 flutter pub get
 flutter analyze                          # must stay at 0 issues
-flutter test                             # 28 tests; no special flags needed
+flutter test                             # 31 tests; no special flags needed
 flutter run [--dart-define=SONORA_PROXY_URL=https://host]   # Android is the primary target
 flutter build apk --debug
 ```
@@ -18,25 +18,26 @@ Flutter 3.44+ / Dart ^3.12.2. Windows dev host with cross-drive (C:/D:) layout.
 
 ```
 lib/
-├── main.dart        # bootstrap: SettingsStore → SonoraApi → SonoraAudioHandler → LocalDatabase? → SonoraApp
-├── data/            # music_models, settings_store, sonora_api, lyrics_store, local_database
+├── main.dart        # bootstrap: SettingsStore → SonoraApi → YouTubeMusicService → SonoraAudioHandler → LocalDatabase? → SonoraApp
+├── data/            # music_models, settings_store, sonora_api, lyrics_store, local_database, youtube_music_service
 ├── playback/        # sonora_audio_handler only
 └── ui/              # sonora_app, app_scope, root_shell, theme, player_actions,
-                     # player/ (controller + chrome), screens/, widgets/
+                     # player/ (controller + chrome), screens/ (home, search, browse, library, settings), widgets/
 ```
 
 - Import direction: `ui` → `data` + `playback`; `playback` → `data`; `data` imports no in-project layer. **`data`/`playback` never import `ui`.**
 - `PlayerController` is UI state and lives in `lib/ui/player/player_controller.dart`, not in `playback/`.
 - **No state-management package.** Hand-rolled `ChangeNotifier` + `InheritedWidget` (`SonoraScope`) + `ValueNotifier`. Don't introduce Provider/Riverpod/Bloc.
-- UI reaches the player only through `PlayerActions.of(context)` (`play`, `playQueue`, `addToQueue`, `open`) and other state via `SonoraScope.of(context)`. Root is an `IndexedStack` of Home/Search/Settings with a persistent `MiniPlayer`.
-- `SonoraAudioHandler` serializes queue mutations through a future chain + generation counter (latest request wins); `AudioPlayer.play()` future is never awaited. Preserve this pattern when touching playback.
+- UI reaches the player only through `PlayerActions.of(context)` (`play`, `playQueue`, `addToQueue`, `open`) and other state via `SonoraScope.of(context)`. Root is an `IndexedStack` of Home/Search/Library/Settings with a persistent `MiniPlayer`.
+- `SonoraAudioHandler` serializes queue mutations through a future chain + generation counter (latest request wins); `AudioPlayer.play()` future is never awaited. Direct YouTube streaming is primary; failure reports clean generic Indonesian errors without leaking unconfigured proxy endpoints.
 
 ## Data-layer invariants
 
+- `YouTubeMusicService`: client-side YouTube extractor (`youtube_explode_dart`); stream resolution prioritizes `manifest.muxed.withHighestBitrate()` (MP4 container with AAC audio track) to bypass GoogleVideo's HTTP 403 anti-scraping block on Android ExoPlayer open-ended range requests; caches resolved stream URIs for 4 hours; provides standalone search and trending feeds without proxy server dependency.
 - `SettingsStore`: SharedPreferences key `sonora.proxyBase`. "Cleared" state is stored as an **empty string, not key deletion** (deliberate — the `--dart-define=SONORA_PROXY_URL` default must not resurrect). Persist-first: write must succeed before notify.
 - `SonoraApi`: injectable `http.Client`; base URL captured synchronously at request start (mid-flight proxy changes don't redirect it); preserves a base path prefix; 20 s timeout; decodes response bodies from UTF-8 **bytes** (latin1 default corrupts text). Error messages are fixed Indonesian strings — never leak server bodies/hosts/URLs into exceptions surfaced to UI.
 - `MusicItem`: `isPlayable` requires non-empty `videoId`; `browseTarget` normalizes playlist IDs to canonical `VL…` prefix. Navigation and playback gating both rely on this.
-- `LocalDatabase` (3 tables: `playback_history` capped at 100, `favorite_tracks`, `search_history`) is wired into `main.dart` and injected via `SonoraScope.database` as **nullable** — SQLite failure must never be fatal; search history chips and the full-player ♥ degrade gracefully to hidden when null.
+- `LocalDatabase` (5 tables: `playback_history` capped at 100, `favorite_tracks`, `search_history`, `user_playlists` / `playlist_tracks`, `saved_collections`, `listening_stats`) is wired into `main.dart` and injected via `SonoraScope.database` as **nullable** — SQLite failure must never be fatal; search history chips, favorites, and playlists degrade gracefully to hidden when null.
 - `LyricsRepository` (`lib/data/lyrics_store.dart`) fetches line-synced lyrics from LRCLIB **directly from the client** (no proxy endpoint). Any failure returns `null`, never throws — lyrics are optional. LRC parse: `LyricsRepository.parseSynced`.
 
 ## Theme & UI conventions

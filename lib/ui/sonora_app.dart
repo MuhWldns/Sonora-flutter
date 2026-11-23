@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../data/local_database.dart';
 import '../data/settings_store.dart';
 import '../data/sonora_api.dart';
+import '../data/youtube_music_service.dart';
 import '../playback/sonora_audio_handler.dart';
 import 'app_scope.dart';
 import 'player/player_controller.dart';
@@ -23,12 +24,14 @@ class SonoraApp extends StatefulWidget {
     required this.settings,
     required this.api,
     required this.audio,
+    required this.ytService,
     this.database,
   });
 
   final SettingsStore settings;
   final SonoraApi api;
   final SonoraAudioHandler audio;
+  final YouTubeMusicService ytService;
   final LocalDatabase? database;
 
   @override
@@ -36,7 +39,8 @@ class SonoraApp extends StatefulWidget {
 }
 
 class _SonoraAppState extends State<SonoraApp> {
-  late final PlayerController _player = PlayerController(widget.audio);
+  late final PlayerController _player =
+      PlayerController(widget.audio, database: widget.database);
   late final AppTabController _tabs = AppTabController();
 
   @override
@@ -51,6 +55,7 @@ class _SonoraAppState extends State<SonoraApp> {
     return SonoraScope(
       settings: widget.settings,
       api: widget.api,
+      ytService: widget.ytService,
       player: _player,
       tabs: _tabs,
       database: widget.database,

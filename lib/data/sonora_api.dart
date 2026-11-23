@@ -15,6 +15,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'lyrics_store.dart';
 import 'music_models.dart';
 import 'settings_store.dart';
 
@@ -136,6 +137,51 @@ class SonoraApi {
     }
     final base = _captureBase();
     return _resolve(base, '/stream', query: {'videoId': id});
+  }
+
+  /// Mengambil lirik dari endpoint `/lyrics?videoId=` milik proxy Sonora.
+  /// Mengembalikan `null` bila proxy tidak menyediakan lirik atau terjadi galat.
+  Future<LrcLyrics?> lyrics(String videoId) async {
+    final id = videoId.trim();
+    if (id.isEmpty || !_settings.isConfigured) return null;
+    try {
+      final base = _captureBase();
+      final uri = _resolve(base, '/lyrics', query: {'videoId': id});
+      final response = await _send(uri);
+      if (response.statusCode != 200) return null;
+      final Object? decoded = jsonDecode(_decodeBody(response));
+      if (decoded is! Map) return null;
+      final Object? lyricsObj = decoded['lyrics'];
+      if (lyricsObj is! Map) return null;
+      return _parseProxyLyrics(lyricsObj);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static LrcLyrics? _parseProxyLyrics(Map<dynamic, dynamic> lyricsObj) {
+    final Object? rawLines = lyricsObj['lines'];
+    final List<LrcLine> synced = <LrcLine>[];
+    if (rawLines is List) {
+      for (final item in rawLines) {
+        if (item is Map) {
+          final text = item['text'] as String? ?? '';
+          final startMs = (item['startMs'] as num?)?.toInt() ?? 0;
+          if (text.isNotEmpty) {
+            synced.add(
+              LrcLine(
+                timestamp: Duration(milliseconds: startMs),
+                text: text,
+              ),
+            );
+          }
+        }
+      }
+    }
+    final Object? plain = lyricsObj['plain'] ?? lyricsObj['plainLyrics'];
+    final String? plainText = plain is String && plain.isNotEmpty ? plain : null;
+    if (synced.isEmpty && plainText == null) return null;
+    return LrcLyrics(synced: synced, plain: plainText);
   }
 
   /// Membebaskan koneksi HTTP. Aman dipanggil berkali-kali.

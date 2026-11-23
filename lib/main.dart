@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'data/settings_store.dart';
 import 'data/sonora_api.dart';
+import 'data/youtube_music_service.dart';
 import 'playback/sonora_audio_handler.dart';
 import 'ui/sonora_app.dart';
 import 'ui/theme.dart';
@@ -22,6 +23,7 @@ class _Startup extends StatefulWidget {
 class _StartupState extends State<_Startup> {
   SettingsStore? _settings;
   SonoraApi? _api;
+  YouTubeMusicService? _ytService;
   SonoraAudioHandler? _audio;
   LocalDatabase? _database;
   bool _failed = false;
@@ -36,11 +38,13 @@ class _StartupState extends State<_Startup> {
     setState(() => _failed = false);
     SettingsStore? settings;
     SonoraApi? api;
+    YouTubeMusicService? ytService;
     LocalDatabase? database;
     try {
       settings = await SettingsStore.load();
       api = SonoraApi(settings);
-      final audio = await SonoraAudioHandler.initialize(api);
+      ytService = YouTubeMusicService();
+      final audio = await SonoraAudioHandler.initialize(api, ytService: ytService);
       // Basis data lokal opsional: riwayat pencarian + favorit. Kegagalan
       // membuka SQLite tidak boleh menggagalkan aplikasi.
       try {
@@ -51,6 +55,7 @@ class _StartupState extends State<_Startup> {
       if (!mounted) {
         await database?.close();
         await audio.dispose();
+        ytService.dispose();
         api.close();
         settings.dispose();
         return;
@@ -58,11 +63,13 @@ class _StartupState extends State<_Startup> {
       setState(() {
         _settings = settings;
         _api = api;
+        _ytService = ytService;
         _audio = audio;
         _database = database;
       });
     } catch (_) {
       await database?.close();
+      ytService?.dispose();
       api?.close();
       settings?.dispose();
       if (mounted) setState(() => _failed = true);
@@ -76,6 +83,7 @@ class _StartupState extends State<_Startup> {
         settings: _settings!,
         api: _api!,
         audio: _audio!,
+        ytService: _ytService!,
         database: _database,
       );
     }

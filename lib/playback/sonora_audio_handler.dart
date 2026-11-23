@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../data/music_models.dart';
 import '../data/sonora_api.dart';
+import '../data/youtube_music_service.dart';
 
 /// Audio handler that bridges the Sonora API to [just_audio] and exposes the
 /// standard [AudioHandler] surface consumed by the UI.
@@ -26,7 +27,11 @@ import '../data/sonora_api.dart';
 /// swallow [PlayerInterruptedException] (expected when a newer request
 /// supersedes an in-flight one) but never let other failures escape unhandled.
 class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
-  SonoraAudioHandler(this._api) : _player = AudioPlayer() {
+  SonoraAudioHandler(
+    this._api, {
+    YouTubeMusicService? ytService,
+  })  : _yt = ytService ?? YouTubeMusicService(),
+        _player = AudioPlayer() {
     _sub = _player.sequenceStateStream.listen(_onSequenceChanged);
     _stateSub = _player.playbackEventStream.listen(_onPlaybackEvent);
     _durationSub = _player.durationStream.listen(_onDuration);
@@ -35,6 +40,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   final SonoraApi _api;
+  final YouTubeMusicService _yt;
   final AudioPlayer _player;
 
   StreamSubscription<SequenceState>? _sub;
@@ -58,6 +64,9 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   /// requests and to detect superseded requests.
   List<String> _signature = const <String>[];
 
+  /// Number of consecutive playback errors during auto-advance.
+  int _consecutiveErrors = 0;
+
   /// Serializes queue mutations so the latest request always wins.
   Future<void> _operations = Future<void>.value();
 
@@ -78,11 +87,14 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   ///
   /// Safe to call on Android and web. Android is the primary target; the web
   /// implementation is provided for smoke testing.
-  static Future<SonoraAudioHandler> initialize(SonoraApi api) async {
+  static Future<SonoraAudioHandler> initialize(
+    SonoraApi api, {
+    YouTubeMusicService? ytService,
+  }) async {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
     final handler = await AudioService.init<SonoraAudioHandler>(
-      builder: () => SonoraAudioHandler(api),
+      builder: () => SonoraAudioHandler(api, ytService: ytService),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.sonora_flutter.playback',
         androidNotificationChannelName: 'Sonora playback',
@@ -160,6 +172,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
       }
       // A newer request may have arrived while loading; if so, it owns playback.
       if (_disposed || generation != _generation) return;
+      _consecutiveErrors = 0;
       error.value = null;
       _publishPlaybackState();
       _startPlayback();
@@ -171,17 +184,23 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     List<String> signature,
     int startIndex,
   ) async {
-    final sources = <AudioSource>[
-      for (final item in playable)
-        AudioSource.uri(
-          _api.streamUri(item.videoId!),
-          tag: item,
-        ),
-    ];
+    final futures = playable.map((item) async {
+      final videoId = item.videoId!;
+      Uri? uri;
+      try {
+        uri = await _yt.resolveStreamUri(videoId);
+      } catch (_) {}
+      if (uri == null) {
+        throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
+      }
+      return AudioSource.uri(uri, tag: item);
+    });
+
+    final sources = await Future.wait(futures);
     try {
       await _player.setAudioSources(
         sources,
-        preload: true,
+        preload: false,
         initialIndex: startIndex,
         initialPosition: Duration.zero,
       );
@@ -249,6 +268,9 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   void _onPlaybackEvent(PlaybackEvent event) {
     _lastEvent = event;
     if (_disposed) return;
+    if (_player.playing && _player.processingState == ProcessingState.ready) {
+      _consecutiveErrors = 0;
+    }
     _publishPlaybackState();
   }
 
@@ -262,11 +284,24 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _onPosition(Duration position) {
     if (_disposed || _positionController.isClosed) return;
+    if (position.inSeconds > 2) {
+      _consecutiveErrors = 0;
+    }
     _positionController.add(position);
   }
 
   void _onPlayerError(PlayerException exception) {
     _publishError(_describe(exception));
+    _consecutiveErrors++;
+    if (_consecutiveErrors <= 3 && _player.hasNext) {
+      Future<void>.delayed(const Duration(milliseconds: 1200), () {
+        if (!_disposed && _player.hasNext) {
+          unawaited(skipToNext());
+        }
+      });
+    } else {
+      _consecutiveErrors = 0;
+    }
   }
 
   void _publishPlaybackState() {
@@ -277,11 +312,13 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     final inError = message != null;
     playbackState.add(
       PlaybackState(
-        processingState: _mapProcessing(state.processingState),
-        playing: state.playing,
+        processingState: inError
+            ? AudioProcessingState.idle
+            : _mapProcessing(state.processingState),
+        playing: inError ? false : state.playing,
         controls: <MediaControl>[
           MediaControl.skipToPrevious,
-          if (state.playing) MediaControl.pause else MediaControl.play,
+          if (state.playing && !inError) MediaControl.pause else MediaControl.play,
           MediaControl.skipToNext,
         ],
         androidCompactActionIndices: const <int>[0, 1, 2],
@@ -375,16 +412,31 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   String _trackKey(MusicItem item) => item.videoId ?? item.title;
 
   String _describe(PlayerException exception) {
-    final message = exception.message;
-    return (message == null || message.isEmpty)
-        ? 'Playback error (code ${exception.code})'
-        : message;
+    final message = exception.message ?? '';
+    final code = '${exception.code}';
+    if (message.contains('500') || code.contains('500')) {
+      return 'Lagu ini tidak dapat diputar saat ini (format audio dibatasi oleh YouTube).';
+    }
+    if (message.contains('403') || code.contains('403')) {
+      return 'Akses pemutaran dibatasi oleh YouTube (403 Forbidden).';
+    }
+    if (message.contains('404') || code.contains('404')) {
+      return 'Audio tidak ditemukan atau telah dihapus (404 Not Found).';
+    }
+    if (message.contains('HttpDataSource') ||
+        message.contains('SocketException') ||
+        message.contains('Connection refused') ||
+        message.contains('timed out')) {
+      return 'Gagal memuat audio. Periksa koneksi internet Anda.';
+    }
+    return message.isNotEmpty ? message : 'Gagal memutar lagu (Error $code)';
   }
 
   @override
   Future<void> play() async {
     // AudioPlayer.play()'s future completes only at pause/stop/end, so it must
     // not be awaited; _startPlayback reports failures via the error notifier.
+    error.value = null;
     _startPlayback();
   }
 
@@ -397,6 +449,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> seek(Duration position) async {
     if (_disposed) return;
+    error.value = null;
     await _player.seek(position);
   }
 
@@ -404,6 +457,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> skipToNext() async {
     if (_disposed) return;
     if (_player.hasNext) {
+      error.value = null;
       await _player.seekToNext();
     }
   }
@@ -412,6 +466,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> skipToPrevious() async {
     if (_disposed) return;
     if (_player.hasPrevious) {
+      error.value = null;
       await _player.seekToPrevious();
     }
   }
@@ -421,6 +476,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     if (_disposed) return;
     final sequence = _player.sequenceState.sequence;
     if (index < 0 || index >= sequence.length) return;
+    error.value = null;
     await _player.seek(Duration.zero, index: index);
   }
 
@@ -452,6 +508,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     await _noisySub?.cancel();
     await _player.dispose();
     await _positionController.close();
+    _yt.dispose();
     error.dispose();
   }
 

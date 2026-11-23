@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'app_scope.dart';
 import 'player/player_chrome.dart';
 import 'screens/home.dart';
+import 'screens/library.dart';
 import 'screens/search.dart';
 import 'screens/settings.dart';
 
@@ -49,6 +50,7 @@ class _RootShellState extends State<RootShell> {
         children: const <Widget>[
           HomeScreen(),
           SearchScreen(),
+          LibraryScreen(),
           SettingsScreen(),
         ],
       ),
@@ -69,6 +71,11 @@ class _RootShellState extends State<RootShell> {
                 icon: Icon(Icons.search_outlined),
                 selectedIcon: Icon(Icons.search_rounded),
                 label: 'Cari',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_music_outlined),
+                selectedIcon: Icon(Icons.library_music_rounded),
+                label: 'Koleksi',
               ),
               NavigationDestination(
                 icon: Icon(Icons.settings_outlined),

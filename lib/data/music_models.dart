@@ -37,6 +37,8 @@ class MusicItem {
     this.playlistId,
     this.duration,
     this.artist = '',
+    this.explicit = false,
+    this.localThumbnailPath,
   });
 
   final String type;
@@ -48,6 +50,8 @@ class MusicItem {
   final String? playlistId;
   final String? duration;
   final String artist;
+  final bool explicit;
+  final String? localThumbnailPath;
 
   /// Dapat diputar bila punya videoId yang tidak kosong.
   bool get isPlayable {
@@ -81,6 +85,7 @@ class MusicItem {
       playlistId: _string(map['playlistId']),
       duration: _string(map['duration']),
       artist: artistNames.isNotEmpty ? artistNames : (subtitle ?? ''),
+      explicit: map['explicit'] == true || map['isExplicit'] == true,
     );
   }
 }

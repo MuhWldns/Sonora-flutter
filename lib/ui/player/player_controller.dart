@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../data/local_database.dart';
 import '../../data/music_models.dart';
 import '../../playback/sonora_audio_handler.dart';
 
@@ -113,7 +114,7 @@ class PlayerSnapshot {
 
 /// Pengendali pemutar yang dapat diamati.
 class PlayerController extends ChangeNotifier {
-  PlayerController(this._handler) {
+  PlayerController(this._handler, {this.database}) {
     _queueSub = _handler.queue.listen(_onQueue);
     _mediaItemSub = _handler.mediaItem.listen(_onMediaItem);
     _stateSub = _handler.playbackState.listen(_onPlaybackState);
@@ -122,6 +123,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   final SonoraAudioHandler _handler;
+  final LocalDatabase? database;
 
   StreamSubscription<List<MediaItem>>? _queueSub;
   StreamSubscription<MediaItem?>? _mediaItemSub;
@@ -133,6 +135,10 @@ class PlayerController extends ChangeNotifier {
 
   List<MediaItem> _nativeQueue = const <MediaItem>[];
   MediaItem? _current;
+
+  DateTime? _lastPlayStartTime;
+  int _accumulatedSeconds = 0;
+  MediaItem? _trackedItem;
 
   bool _disposed = false;
   bool _playing = false;
@@ -357,6 +363,7 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     if (_disposed) return;
+    _flushTrackedSession();
     _disposed = true;
     _queueSub?.cancel();
     _mediaItemSub?.cancel();
@@ -364,6 +371,29 @@ class PlayerController extends ChangeNotifier {
     _positionSub?.cancel();
     _handler.error.removeListener(_onError);
     super.dispose();
+  }
+
+  void _flushTrackedSession() {
+    if (_trackedItem == null) return;
+    if (_lastPlayStartTime != null) {
+      _accumulatedSeconds +=
+          DateTime.now().difference(_lastPlayStartTime!).inSeconds;
+      _lastPlayStartTime = null;
+    }
+    final item = _trackedItem!;
+    final seconds = _accumulatedSeconds;
+    _accumulatedSeconds = 0;
+    if (seconds >= 15 && database != null) {
+      unawaited(
+        database!
+            .recordListeningLog(
+              item: _fromMediaItem(item),
+              listenedSeconds: seconds,
+              durationSeconds: item.duration?.inSeconds ?? 0,
+            )
+            .catchError((_) {}),
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -378,6 +408,21 @@ class PlayerController extends ChangeNotifier {
 
   void _onMediaItem(MediaItem? item) {
     if (_disposed) return;
+    final String? prevId = _current?.id;
+    if (prevId != item?.id) {
+      _flushTrackedSession();
+      _trackedItem = item;
+      if (item != null) {
+        if (_playing) {
+          _lastPlayStartTime = DateTime.now();
+        }
+        if (database != null) {
+          unawaited(
+            database!.recordPlayback(_fromMediaItem(item)).catchError((_) {}),
+          );
+        }
+      }
+    }
     _current = item;
     _duration = item?.duration ?? Duration.zero;
     _publish(_compose());
@@ -385,12 +430,26 @@ class PlayerController extends ChangeNotifier {
 
   void _onPlaybackState(PlaybackState state) {
     if (_disposed) return;
+    final bool wasPlaying = _playing;
     _playing = state.playing;
     _buffering = state.processingState == AudioProcessingState.loading ||
         state.processingState == AudioProcessingState.buffering;
     _position = state.updatePosition;
+
+    if (_playing && !wasPlaying) {
+      _lastPlayStartTime = DateTime.now();
+    } else if (!_playing && wasPlaying) {
+      if (_lastPlayStartTime != null) {
+        _accumulatedSeconds +=
+            DateTime.now().difference(_lastPlayStartTime!).inSeconds;
+        _lastPlayStartTime = null;
+      }
+    }
+
     if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
       _error = state.errorMessage;
+    } else if (_handler.error.value == null) {
+      _error = null;
     }
     _publish(_compose());
   }
@@ -407,10 +466,8 @@ class PlayerController extends ChangeNotifier {
   void _onError() {
     if (_disposed) return;
     final String? message = _handler.error.value;
-    if (message != null && message.isNotEmpty) {
-      _error = message;
-      _publish(_compose());
-    }
+    _error = (message != null && message.isNotEmpty) ? message : null;
+    _publish(_compose());
   }
 
   // ---------------------------------------------------------------------------
@@ -464,8 +521,8 @@ class PlayerController extends ChangeNotifier {
     return PlayerSnapshot(
       queue: queue,
       index: index,
-      playing: _playing,
-      buffering: _buffering,
+      playing: _error != null ? false : _playing,
+      buffering: _error != null ? false : _buffering,
       position: _position > duration ? duration : _position,
       duration: duration,
       shuffle: _shuffle,

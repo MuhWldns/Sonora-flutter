@@ -149,11 +149,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Server proxy', style: context.texts.titleMedium),
+                        Text('Server proxy (Opsional)', style: context.texts.titleMedium),
                         const SizedBox(height: kSpaceXs),
                         Text(
-                          'Alamat proxy Sonora milikmu (http/https lengkap). '
-                          'Audio dan feed diambil melalui alamat ini.',
+                          'Alamat proxy Sonora (opsional). '
+                          'Jika dikosongkan, pemutaran dan pencarian musik berjalan '
+                          'langsung secara mandiri dari perangkat ala BitChord.',
                           style: context.texts.bodyMedium
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
@@ -231,7 +232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: kSpaceXl),
                   Text(
-                    'Proxy stateless • streaming via /stream',
+                    'Direct Stream YouTube (Bitrate Tertinggi) • Standalone ala BitChord',
                     style: context.texts.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant),
                     textAlign: TextAlign.center,

@@ -3,6 +3,8 @@
 /// tema Sonora (Nocturne).
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../data/music_models.dart';
@@ -41,6 +43,7 @@ class CoverArt extends StatelessWidget {
   const CoverArt({
     super.key,
     this.url,
+    this.localPath,
     required this.size,
     this.circle = false,
     this.radius = kRadiusSm,
@@ -48,6 +51,7 @@ class CoverArt extends StatelessWidget {
   });
 
   final String? url;
+  final String? localPath;
   final double size;
   final bool circle;
   final double radius;
@@ -66,7 +70,16 @@ class CoverArt extends StatelessWidget {
         height: size,
         child: ColoredBox(
           color: scheme.surfaceContainerHighest,
-          child: source == null
+          child: localPath != null
+              ? Image.file(
+                  File(localPath!),
+                  fit: BoxFit.cover,
+                  width: size,
+                  height: size,
+                  errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+                      _fallback(scheme),
+                )
+              : source == null
               ? _fallback(scheme)
               : Image.network(
                   source,

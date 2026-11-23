@@ -16,6 +16,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 import 'package:sonora_flutter/data/music_models.dart';
 import 'package:sonora_flutter/data/settings_store.dart';
 import 'package:sonora_flutter/data/sonora_api.dart';
+import 'package:sonora_flutter/data/youtube_music_service.dart';
 
 const String _feedJson = '''
 {
@@ -582,6 +583,20 @@ void main() {
       api.close();
       await expectLater(api.home(), throwsA(isA<SonoraApiException>()));
       store.dispose();
+    });
+  });
+
+  group('YouTubeMusicService', () {
+    test('input videoId kosong mengembalikan null secara aman', () async {
+      final service = YouTubeMusicService();
+      final uri = await service.resolveStreamUri('');
+      expect(uri, isNull);
+      final searchResult = await service.search('');
+      expect(searchResult, isEmpty);
+      service.dispose();
+      // Setelah dispose, pemanggilan tetap aman dan mengembalikan fallback
+      expect(await service.resolveStreamUri('test'), isNull);
+      expect(await service.search('test'), isEmpty);
     });
   });
 }

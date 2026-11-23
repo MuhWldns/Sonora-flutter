@@ -114,7 +114,6 @@ class _SearchScreenState extends State<SearchScreen> {
     final String trimmed = query.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (trimmed.isEmpty) return;
     final SonoraScope scope = SonoraScope.of(context);
-    if (!scope.settings.isConfigured) return;
     final int generation = ++_generation;
     setState(() {
       _loading = true;
@@ -128,7 +127,22 @@ class _SearchScreenState extends State<SearchScreen> {
           .catchError((Object _) {}),
     );
     try {
-      final List<MusicSection> sections = await scope.api.search(trimmed, filter: _filter);
+      List<MusicSection> sections;
+      if (scope.settings.isConfigured) {
+        try {
+          sections = await scope.api.search(trimmed, filter: _filter);
+        } catch (_) {
+          final directItems = await scope.ytService.search(trimmed);
+          sections = <MusicSection>[
+            MusicSection(title: 'Hasil Pencarian', items: directItems),
+          ];
+        }
+      } else {
+        final directItems = await scope.ytService.search(trimmed);
+        sections = <MusicSection>[
+          MusicSection(title: 'Hasil Pencarian', items: directItems),
+        ];
+      }
       if (!mounted || generation != _generation) return;
       setState(() {
         _sections = sections;
@@ -202,7 +216,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: TextField(
                     controller: _controller,
                     focusNode: _focus,
-                    enabled: scope.settings.isConfigured,
+                    enabled: true,
                     textInputAction: TextInputAction.search,
                     onChanged: _onChanged,
                     onSubmitted: _run,
@@ -255,18 +269,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _body(SonoraScope scope) {
-    if (!scope.settings.isConfigured) {
-      return EmptyState(
-        icon: Icons.settings_ethernet_rounded,
-        title: 'Proxy belum diatur',
-        message: 'Atur alamat proxy di Pengaturan sebelum mencari musik.',
-        action: FilledButton.icon(
-          onPressed: () => scope.tabs.goTo(AppTabs.settings),
-          icon: const Icon(Icons.settings_rounded),
-          label: const Text('Buka Pengaturan'),
-        ),
-      );
-    }
     if (_loading) return const SkeletonHomeFeed();
     if (_error != null) return ErrorState(message: _error!, onRetry: () => _run(_submitted));
     if (_sections == null) return _noQueryBody(scope);

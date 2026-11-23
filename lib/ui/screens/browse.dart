@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../data/music_models.dart';
 import '../../data/sonora_api.dart';
 import '../app_scope.dart';
+import '../player/player_chrome.dart';
 import '../player/player_controller.dart';
 import '../player_actions.dart';
 import '../theme.dart';
@@ -22,6 +23,7 @@ class BrowseScreen extends StatefulWidget {
     required this.title,
     this.thumbnail,
     this.typeLabel = 'Album',
+    this.collectionItem,
   });
 
   final String browseId;
@@ -30,6 +32,7 @@ class BrowseScreen extends StatefulWidget {
 
   /// Label jenis sumber untuk overline header (album/playlist/artis).
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -94,11 +97,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           title: widget.title,
                           thumbnail: widget.thumbnail,
                           typeLabel: widget.typeLabel,
+                          collectionItem: widget.collectionItem,
                         ),
             ),
           ],
         ),
       ),
+      bottomNavigationBar: const MiniPlayer(),
       backgroundColor: scheme.surface,
     );
   }
@@ -110,12 +115,14 @@ class _BrowseBody extends StatelessWidget {
     required this.title,
     required this.thumbnail,
     required this.typeLabel,
+    this.collectionItem,
   });
 
   final List<MusicSection> sections;
   final String title;
   final String? thumbnail;
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   Widget build(BuildContext context) {
@@ -150,6 +157,7 @@ class _BrowseBody extends StatelessWidget {
               title: title,
               thumbnail: thumbnail,
               typeLabel: typeLabel,
+              collectionItem: collectionItem,
             );
           }
           final MusicSection section = visible[index - 1];
@@ -204,6 +212,7 @@ class _BrowseHeader extends StatelessWidget {
     required this.title,
     required this.thumbnail,
     required this.typeLabel,
+    this.collectionItem,
   });
 
   final List<MusicItem> playable;
@@ -211,6 +220,7 @@ class _BrowseHeader extends StatelessWidget {
   final String title;
   final String? thumbnail;
   final String typeLabel;
+  final MusicItem? collectionItem;
 
   @override
   Widget build(BuildContext context) {
@@ -285,6 +295,10 @@ class _BrowseHeader extends StatelessWidget {
                       label: const Text('Acak'),
                     ),
                   ),
+                  if (collectionItem != null) ...<Widget>[
+                    const SizedBox(width: kSpaceSm),
+                    _SaveCollectionCheckbox(item: collectionItem!),
+                  ],
                 ],
               ),
             ],
@@ -292,6 +306,61 @@ class _BrowseHeader extends StatelessWidget {
         ),
         const SizedBox(height: kSpaceSm),
       ],
+    );
+  }
+}
+
+class _SaveCollectionCheckbox extends StatefulWidget {
+  const _SaveCollectionCheckbox({required this.item});
+  final MusicItem item;
+
+  @override
+  State<_SaveCollectionCheckbox> createState() =>
+      _SaveCollectionCheckboxState();
+}
+
+class _SaveCollectionCheckboxState extends State<_SaveCollectionCheckbox> {
+  bool _saved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final db = SonoraScope.of(context).database;
+      if (db == null) return;
+      final value = await db.isCollectionSaved(widget.item);
+      if (mounted) setState(() => _saved = value);
+    });
+  }
+
+  Future<void> _toggle(bool value) async {
+    final db = SonoraScope.of(context).database;
+    if (db == null) {
+      showSonoraSnack(context, 'Penyimpanan lokal tidak tersedia');
+      return;
+    }
+    if (value) {
+      await db.saveCollection(widget.item);
+    } else {
+      await db.removeCollection(widget.item);
+    }
+    if (mounted) setState(() => _saved = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = context.scheme;
+    return Material(
+      color: scheme.surfaceContainerHigh,
+      shape: const CircleBorder(),
+      child: IconButton(
+        tooltip: _saved ? 'Hapus dari koleksi' : 'Simpan ke koleksi',
+        icon: Icon(
+          _saved ? Icons.bookmark_added_rounded : Icons.bookmark_add_outlined,
+          color: _saved ? context.sonora.accentText : scheme.onSurfaceVariant,
+        ),
+        onPressed: () => _toggle(!_saved),
+      ),
     );
   }
 }

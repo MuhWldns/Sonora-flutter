@@ -70,8 +70,22 @@ class LyricsRepository {
   Future<LrcLyrics?> find({
     required String track,
     required String artist,
+    String? videoId,
     int? durationMs,
+    Future<LrcLyrics?> Function(String videoId)? proxyLyrics,
   }) async {
+    // 0) Coba endpoint proxy Sonora terlebih dahulu bila tersedia videoId dan resolver
+    if (videoId != null && videoId.trim().isNotEmpty && proxyLyrics != null) {
+      try {
+        final LrcLyrics? fromProxy = await proxyLyrics(videoId.trim());
+        if (fromProxy != null && (fromProxy.hasSynced || fromProxy.plain != null)) {
+          return fromProxy;
+        }
+      } catch (_) {
+        // Abaikan galat proxy dan fallback ke LRCLIB langsung
+      }
+    }
+
     final String trackName = track.trim();
     final String artistName = artist.trim();
     if (trackName.isEmpty) return null;

@@ -12,6 +12,7 @@ import '../../data/local_database.dart';
 import '../../data/lyrics_store.dart';
 import '../../data/music_models.dart';
 import '../app_scope.dart';
+import '../player_actions.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'player_controller.dart';
@@ -416,6 +417,46 @@ class _ArtworkViewState extends State<_ArtworkView> {
                   style: context.texts.bodyLarge
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
+                if (widget.snap.error != null) ...<Widget>[
+                  const SizedBox(height: kSpaceSm),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: kSpaceMd,
+                        vertical: kSpaceXs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.errorContainer.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(kRadiusSm),
+                        border: Border.all(
+                          color: scheme.error.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(
+                            Icons.error_outline_rounded,
+                            size: 16,
+                            color: scheme.error,
+                          ),
+                          const SizedBox(width: kSpaceXs),
+                          Flexible(
+                            child: Text(
+                              widget.snap.error!,
+                              textAlign: TextAlign.center,
+                              style: context.texts.bodySmall?.copyWith(
+                                color: scheme.error,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: kSpaceXl),
                 _ProgressBar(player: widget.player, snap: widget.snap),
                 const SizedBox(height: kSpaceSm),
@@ -424,7 +465,7 @@ class _ArtworkViewState extends State<_ArtworkView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: <Widget>[
-                    if (SonoraScope.of(context).database != null)
+                    if (SonoraScope.of(context).database != null) ...<Widget>[
                       IconButton(
                         tooltip: _favorite ? 'Hapus dari favorit' : 'Tambahkan ke favorit',
                         iconSize: 24,
@@ -436,6 +477,28 @@ class _ArtworkViewState extends State<_ArtworkView> {
                         ),
                         onPressed: _toggleFavorite,
                       ),
+                      IconButton(
+                        tooltip: 'Tambahkan ke playlist',
+                        iconSize: 24,
+                        color: scheme.onSurfaceVariant,
+                        icon: const Icon(Icons.playlist_add_rounded),
+                        onPressed: () {
+                          final item = MusicItem(
+                            type: 'song',
+                            title: widget.track.title,
+                            artist: widget.track.artist,
+                            thumbnail: widget.track.thumbnail,
+                            videoId: widget.track.videoId,
+                            duration: formatDurationMs(
+                              widget.track.durationMs > 0
+                                  ? widget.track.durationMs
+                                  : null,
+                            ),
+                          );
+                          PlayerActions.of(context).showPlaylistPicker(item);
+                        },
+                      ),
+                    ],
                     IconButton(
                       tooltip: 'Lihat lirik',
                       iconSize: 24,
@@ -672,10 +735,13 @@ class _LyricsViewState extends State<_LyricsView> {
     }
     if (mounted) setState(() => _phase = _LyricsPhase.loading);
     _repo ??= LyricsRepository();
+    final api = SonoraScope.of(context).api;
     final LrcLyrics? lyrics = await _repo!.find(
       track: widget.track.title,
       artist: widget.track.artist,
+      videoId: widget.track.videoId,
       durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
+      proxyLyrics: api.lyrics,
     );
     // Balasan basi: lagu sudah berganti saat permintaan berjalan.
     if (!mounted || _lyricsKey != widget.track.videoId) return;
