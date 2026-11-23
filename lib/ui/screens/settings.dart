@@ -277,14 +277,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
                                   Text(
-                                    'Ukuran Cache Saat Ini',
+                                    'Penggunaan Cache (Batas: 500 MB)',
                                     style: context.texts.labelSmall
                                         ?.copyWith(color: scheme.onSurfaceVariant),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    AudioCacheService.formatBytes(_cacheBytes),
-                                    style: context.texts.titleLarge?.copyWith(
+                                    '${AudioCacheService.formatBytes(_cacheBytes)} / 500 MB',
+                                    style: context.texts.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: scheme.onSurface,
                                     ),
@@ -304,6 +304,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               label: const Text('Bersihkan'),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: kSpaceMd),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(kRadiusSm),
+                          child: LinearProgressIndicator(
+                            value: (_cacheBytes / AudioCacheService.defaultMaxCacheSizeBytes)
+                                .clamp(0.0, 1.0),
+                            minHeight: 6,
+                            backgroundColor: scheme.surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              (_cacheBytes / AudioCacheService.defaultMaxCacheSizeBytes) > 0.9
+                                  ? scheme.error
+                                  : scheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: kSpaceXs),
+                        Text(
+                          'Pembersihan otomatis LRU: memangkas ke 400 MB saat mencapai batas 500 MB.',
+                          style: context.texts.labelSmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ],
                     ),

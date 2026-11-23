@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'data/audio_cache_service.dart';
 import 'data/local_database.dart';
 import 'data/settings_store.dart';
 import 'data/sonora_api.dart';
@@ -52,6 +55,8 @@ class _StartupState extends State<_Startup> {
       } catch (_) {
         database = null;
       }
+      // Pemangkasan cache audio di latar belakang (LRU max 500 MB) pada startup.
+      unawaited(AudioCacheService.pruneCache());
       if (!mounted) {
         await database?.close();
         await audio.dispose();

@@ -7,7 +7,7 @@ Flutter music-player client with standalone-first direct YouTube playback (BitCh
 ```sh
 flutter pub get
 flutter analyze                          # must stay at 0 issues
-flutter test                             # 33 tests; no special flags needed
+flutter test                             # 34 tests; no special flags needed
 flutter run [--dart-define=SONORA_PROXY_URL=https://host]   # Android is the primary target
 flutter build apk --debug
 ```

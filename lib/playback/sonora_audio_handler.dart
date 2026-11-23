@@ -5,6 +5,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../data/audio_cache_service.dart';
 import '../data/music_models.dart';
 import '../data/sonora_api.dart';
 import '../data/youtube_music_service.dart';
@@ -219,6 +220,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
     // Broadcast so the notification and UI agree with the native playlist.
     _publishQueue();
     _publishMediaItem();
+    unawaited(AudioCacheService.pruneCache());
     return true;
   }
 

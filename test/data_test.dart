@@ -619,6 +619,13 @@ void main() {
       await AudioCacheService.clearCache();
       expect(await AudioCacheService.getCacheSizeBytes(), isNonNegative);
     });
+
+    test('pruneCache aman dipanggil dengan limit custom dan default', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      await AudioCacheService.pruneCache(maxBytes: 100);
+      await AudioCacheService.pruneCache();
+      expect(await AudioCacheService.getCacheSizeBytes(), isNonNegative);
+    });
   });
 }
 
