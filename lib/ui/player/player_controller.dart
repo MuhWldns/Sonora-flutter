@@ -267,11 +267,11 @@ class PlayerController extends ChangeNotifier {
       };
       final List<MusicItem> suggestions = await fetcher(
         seed,
-        limit: 10,
+        limit: 50,
         exclude: exclude,
       );
       if (_disposed || suggestions.isEmpty) return;
-      await _handler.appendSuggestions(suggestions);
+      await _handler.appendSuggestions(suggestions, afterVideoId: seed);
     } catch (_) {
       // Radio bersifat opsional; kegagalan tidak boleh mengganggu pemutaran.
     } finally {
@@ -355,46 +355,21 @@ class PlayerController extends ChangeNotifier {
       await stop();
       return;
     }
-    await _serialize(() async {
-      final List<MusicItem> items = _nativeQueue
-          .map(_fromMediaItem)
-          .where((MusicItem entry) => entry.isPlayable)
-          .toList();
-      if (index >= items.length) return;
-      items.removeAt(index);
-      final int active = _snapshot.index;
-      final int target = active <= 0
-          ? 0
-          : (active >= items.length ? items.length - 1 : active);
-      try {
-        await _handler.playItems(items, startIndex: target);
-      } catch (error) {
-        _setError(_message(error));
-      }
-    });
+    try {
+      await _handler.removeQueueItemAt(index);
+    } catch (error) {
+      _setError(_message(error));
+    }
   }
 
   Future<void> moveItem(int from, int to) async {
     if (from == to) return;
     if (from < 0 || to < 0 || from >= _snapshot.queue.length) return;
-    await _serialize(() async {
-      final List<MusicItem> items = _nativeQueue
-          .map(_fromMediaItem)
-          .where((MusicItem entry) => entry.isPlayable)
-          .toList();
-      if (from >= items.length || to > items.length) return;
-      final MusicItem moved = items.removeAt(from);
-      items.insert(to.clamp(0, items.length), moved);
-      final String? activeId = _snapshot.current?.videoId;
-      final int target = activeId == null
-          ? 0
-          : items.indexWhere((MusicItem entry) => entry.videoId == activeId);
-      try {
-        await _handler.playItems(items, startIndex: target < 0 ? 0 : target);
-      } catch (error) {
-        _setError(_message(error));
-      }
-    });
+    try {
+      await _handler.moveQueueItem(from, to);
+    } catch (error) {
+      _setError(_message(error));
+    }
   }
 
   /// Menghentikan pemutaran dan membersihkan antrean. Dipakai saat endpoint

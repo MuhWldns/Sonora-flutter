@@ -38,7 +38,10 @@ abstract interface class SonoraPlaybackHandler implements AudioHandler {
   /// platform does not support it.
   AndroidEqualizer? get equalizer;
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0});
-  Future<void> appendSuggestions(List<MusicItem> items);
+  Future<void> appendSuggestions(List<MusicItem> items, {String? afterVideoId});
+  Future<void> moveQueueItem(int from, int to);
+  @override
+  Future<void> removeQueueItemAt(int index);
 }
 
 class SonoraAudioHandler extends BaseAudioHandler
@@ -318,26 +321,118 @@ class SonoraAudioHandler extends BaseAudioHandler
 
   /// Menambahkan saran radio ke ekor antrean tanpa memutus lagu yang sedang
   /// diputar (AutoPlay). Lagu yang gagal diselesaikan URI-nya dilewati.
+  ///
+  /// Diserialisasi lewat [_enqueue] dan menunggu pemuatan awal selesai agar
+  /// tidak berbenturan dengan prepare lagu pertama — benturan itulah yang
+  /// membuat lagu lambat mulai dan antrean tampak kosong di UI.
   @override
-  Future<void> appendSuggestions(List<MusicItem> items) async {
-    final List<AudioSource> sources = <AudioSource>[];
-    for (final MusicItem item in items) {
-      final String? videoId = item.videoId;
-      if (videoId == null || videoId.isEmpty) continue;
-      try {
-        final Uri? uri = await _yt.resolveStreamUri(
-          videoId,
-          quality: settings?.audioQuality ?? AudioQuality.auto,
-        );
-        if (uri == null) continue;
-        sources.add(_audioSourceFor(item, uri));
-      } catch (_) {
-        // Lewati saran yang tidak dapat diselesaikan.
+  Future<void> appendSuggestions(List<MusicItem> items, {String? afterVideoId}) {
+    return _enqueue(() async {
+      if (_disposed || items.isEmpty) return;
+      // Antrean bisa berganti selama saran diambil; lewati bila ekor antrean
+      // bukan lagi lagu yang menjadi seed saran ini.
+      if (afterVideoId != null) {
+        final sequence = _player.sequence;
+        final Object? lastTag = sequence.isNotEmpty ? sequence.last.tag : null;
+        final String? lastVideoId = lastTag is MusicItem ? lastTag.videoId : null;
+        if (lastVideoId != afterVideoId) return;
       }
-    }
-    if (sources.isEmpty) return;
-    await _player.addAudioSources(sources);
-    _publishQueue();
+      if (_player.playerState.processingState == ProcessingState.loading) {
+        try {
+          await _player.playerStateStream
+              .firstWhere(
+                (PlayerState state) =>
+                    state.processingState != ProcessingState.loading,
+              )
+              .timeout(const Duration(seconds: 8));
+        } catch (_) {
+          return;
+        }
+      }
+      if (_disposed) return;
+      // Resolusi URI dijalankan paralel terbatas agar puluhan saran tidak
+      // diselesaikan satu per satu.
+      final List<AudioSource?> resolved = List<AudioSource?>.filled(
+        items.length,
+        null,
+      );
+      int cursor = 0;
+      Future<void> worker() async {
+        while (cursor < items.length) {
+          final int i = cursor++;
+          final String? videoId = items[i].videoId;
+          if (videoId == null || videoId.isEmpty) continue;
+          try {
+            final Uri? uri = await _yt.resolveStreamUri(
+              videoId,
+              quality: settings?.audioQuality ?? AudioQuality.auto,
+            );
+            if (uri != null) resolved[i] = _audioSourceFor(items[i], uri);
+          } catch (_) {
+            // Lewati saran yang tidak dapat diselesaikan.
+          }
+        }
+      }
+      await Future.wait(<Future<void>>[
+        for (var w = 0; w < 8; w++) worker(),
+      ]);
+      final List<AudioSource> sources = resolved
+          .whereType<AudioSource>()
+          .toList();
+      if (_disposed || sources.isEmpty) return;
+      try {
+        await _player.addAudioSources(sources);
+        _publishQueue();
+      } on PlayerInterruptedException {
+        // Antrean baru menggantikan yang lama; biarkan yang terbaru menang.
+      }
+    });
+  }
+
+  /// Memindahkan item antrean memakai operasi playlist native sehingga lagu
+  /// yang sedang diputar tidak berhenti dan tidak mengulang dari awal.
+  @override
+  Future<void> moveQueueItem(int from, int to) {
+    return _enqueue(() async {
+      if (_disposed) return;
+      final int count = _player.sequence.length;
+      if (from < 0 || from >= count || count < 2) return;
+      int target = to;
+      if (target > from) target -= 1; // Konvensi indeks ReorderableListView.
+      target = target.clamp(0, count - 1);
+      if (target == from) return;
+      final AudioSource source = _player.sequence[from];
+      try {
+        await _player.removeAudioSourceAt(from);
+        await _player.insertAudioSource(target, source);
+      } on PlayerInterruptedException {
+        return;
+      }
+      if (_signature.length == count && from < _signature.length) {
+        final String key = _signature.removeAt(from);
+        _signature.insert(target.clamp(0, _signature.length), key);
+      }
+      _publishQueue();
+    });
+  }
+
+  /// Menghapus satu item antrean tanpa memuat ulang seluruh playlist.
+  @override
+  Future<void> removeQueueItemAt(int index) {
+    return _enqueue(() async {
+      if (_disposed) return;
+      final int count = _player.sequence.length;
+      if (index < 0 || index >= count || count <= 1) return;
+      try {
+        await _player.removeAudioSourceAt(index);
+      } on PlayerInterruptedException {
+        return;
+      }
+      if (_signature.length == count && index < _signature.length) {
+        _signature.removeAt(index);
+      }
+      _publishQueue();
+    });
   }
 
   /// Starts playback without awaiting its lifetime.

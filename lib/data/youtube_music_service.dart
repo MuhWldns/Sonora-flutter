@@ -72,9 +72,14 @@ class YouTubeMusicService {
 
       final List<StreamInfo> candidates = _orderCandidates(manifest, quality);
 
-      for (final StreamInfo stream in candidates) {
-        if (!await _streamUsable(stream.url)) continue;
-        final Uri uri = stream.url;
+      // Uji seluruh kandidat secara paralel agar lagu cepat mulai; urutan
+      // preferensi tetap dipakai saat memilih kandidat pertama yang lolos.
+      final List<bool> usable = await Future.wait(
+        candidates.map((StreamInfo stream) => _streamUsable(stream.url)),
+      );
+      for (var i = 0; i < candidates.length; i++) {
+        if (!usable[i]) continue;
+        final Uri uri = candidates[i].url;
         _streamCache[videoId] = _CachedStream(
           uri: uri,
           expiresAt: DateTime.now().add(_cacheTtl),
@@ -282,7 +287,7 @@ class YouTubeMusicService {
           .send(
             http.Request('GET', url)..headers['user-agent'] = _playerUserAgent,
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 6));
       final int status = response.statusCode;
       return status >= 200 && status < 400;
     } catch (e) {
@@ -357,20 +362,28 @@ class YouTubeMusicService {
   /// sifat radio bersifat opsional dan tidak boleh mengganggu pemutaran.
   Future<List<MusicItem>> fetchRadio(
     String videoId, {
-    int limit = 10,
+    int limit = 50,
     Set<String> exclude = const <String>{},
   }) async {
     if (_disposed || videoId.trim().isEmpty) return const <MusicItem>[];
     try {
       final Video seed = await _yt.videos.get(videoId.trim());
-      final RelatedVideosList? related = await _yt.videos.getRelatedVideos(seed);
+      RelatedVideosList? related = await _yt.videos.getRelatedVideos(seed);
       if (related == null) return const <MusicItem>[];
       final List<MusicItem> items = <MusicItem>[];
-      for (final Video video in related) {
-        if (items.length >= limit) break;
-        final MusicItem item = _videoToItem(video);
-        if (!item.isPlayable || exclude.contains(item.videoId)) continue;
-        items.add(item);
+      final Set<String> seen = <String>{...exclude};
+      // Telusuri halaman saran sampai limit terpenuhi (maks. 6 halaman).
+      for (var page = 0; page < 6 && related != null && items.length < limit; page++) {
+        for (final Video video in related) {
+          if (items.length >= limit) break;
+          final MusicItem item = _videoToItem(video);
+          if (!item.isPlayable || seen.contains(item.videoId)) continue;
+          seen.add(item.videoId!);
+          items.add(item);
+        }
+        if (items.length < limit) {
+          related = await related.nextPage();
+        }
       }
       return items;
     } catch (_) {

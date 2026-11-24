@@ -54,7 +54,16 @@ class FakeSonoraAudioHandler extends BaseAudioHandler
   AndroidEqualizer? get equalizer => null;
 
   @override
-  Future<void> appendSuggestions(List<MusicItem> items) async {}
+  Future<void> appendSuggestions(
+    List<MusicItem> items, {
+    String? afterVideoId,
+  }) async {}
+
+  @override
+  Future<void> moveQueueItem(int from, int to) async {}
+
+  @override
+  Future<void> removeQueueItemAt(int index) async {}
 
   @override
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0}) async {
