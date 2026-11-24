@@ -737,13 +737,20 @@ class _LyricsViewState extends State<_LyricsView> {
     _repo ??= LyricsRepository();
     final api = SonoraScope.of(context).api;
     final (String trackName, String artistName) = _lyricsQueryNames();
-    final LrcLyrics? lyrics = await _repo!.find(
-      track: trackName,
-      artist: artistName,
-      videoId: widget.track.videoId,
-      durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
-      proxyLyrics: api.lyrics,
-    );
+    // Pagu total: apa pun yang gagal atau menggantung (proxy/LRCLIB), fallback
+    // "lirik tidak ditemukan" tetap tampil, tidak ada skeleton selamanya.
+    LrcLyrics? lyrics;
+    try {
+      lyrics = await _repo!.find(
+        track: trackName,
+        artist: artistName,
+        videoId: widget.track.videoId,
+        durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
+        proxyLyrics: api.lyrics,
+      ).timeout(const Duration(seconds: 12));
+    } catch (_) {
+      lyrics = null;
+    }
     // Balasan basi: lagu sudah berganti saat permintaan berjalan.
     if (!mounted || _lyricsKey != widget.track.videoId) return;
     setState(() {
