@@ -323,22 +323,45 @@ class YouTubeMusicService {
     return search('Top Music Hits 2026');
   }
 
-  /// Mengambil nama akun YouTube Music yang sedang masuk.
+  /// Mengirim POST `account/account_menu` untuk [session] (atau sesi aktif).
   ///
-  /// [session] opsional dipakai untuk memvalidasi kandidat sesi sebelum
-  /// dijadikan sesi aktif. Mengembalikan `null` bila gagal atau belum masuk.
-  Future<String?> fetchAccountName({YoutubeSession? session}) async {
+  /// Mengembalikan `null` bila layanan sudah ditutup atau request gagal.
+  Future<http.Response?> _postAccountMenu({YoutubeSession? session}) async {
     if (_disposed) return null;
     try {
-      final http.Response response = await _postMusicInnertube(
+      return await _postMusicInnertube(
         'account/account_menu',
         const <String, dynamic>{},
         session: session,
       );
-      if (response.statusCode != 200) return null;
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal memanggil account_menu: $e');
+      return null;
+    }
+  }
+
+  /// Memvalidasi sesi YouTube Music lewat status HTTP `account_menu`.
+  ///
+  /// Validasi berbasis status (HTTP 200 = sesi aktif) dan tidak bergantung
+  /// pada isi respons, sehingga perubahan bentuk JSON dari Google tidak
+  /// membuat cookie yang masih valid ditolak.
+  Future<bool> validateSession({YoutubeSession? session}) async {
+    final http.Response? response = await _postAccountMenu(session: session);
+    return response != null && response.statusCode == 200;
+  }
+
+  /// Mengambil nama akun YouTube Music yang sedang masuk.
+  ///
+  /// [session] opsional dipakai untuk permintaan kandidat sesi. Nama akun
+  /// hanya pelengkap tampilan; kegagalan membacanya bukan tanda sesi
+  /// invalid. Mengembalikan `null` bila gagal atau belum masuk.
+  Future<String?> fetchAccountName({YoutubeSession? session}) async {
+    final http.Response? response = await _postAccountMenu(session: session);
+    if (response == null || response.statusCode != 200) return null;
+    try {
       return _findAccountName(jsonDecode(utf8.decode(response.bodyBytes)));
     } catch (e) {
-      debugPrint('[YouTubeMusicService] Gagal mengambil nama akun: $e');
+      debugPrint('[YouTubeMusicService] Gagal membaca nama akun: $e');
       return null;
     }
   }
@@ -423,7 +446,7 @@ class YouTubeMusicService {
           'hl': _musicHl,
           'gl': _musicGl,
         },
-        if (active != null)
+        if (active != null && active.dataSyncId.isNotEmpty)
           'user': <String, dynamic>{'onBehalfOfUser': active.dataSyncId},
       },
       ...payload,
@@ -439,7 +462,7 @@ class YouTubeMusicService {
           active?.clientVersion ?? _fallbackRemixClientVersion,
       if (active != null) ...<String, String>{
         'x-goog-visitor-id': active.visitorData,
-        'x-goog-authuser': active.authUser,
+        if (active.authUser.isNotEmpty) 'x-goog-authuser': active.authUser,
         if (active.pageId != null && active.pageId!.isNotEmpty)
           'x-goog-pageid': active.pageId!,
         'cookie': active.cookie,

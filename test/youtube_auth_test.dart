@@ -457,4 +457,81 @@ void main() {
       service.dispose();
     });
   });
+
+  group('YouTubeMusicService.validateSession', () {
+    test('true saat HTTP 200 meski isi respons tidak memuat nama akun',
+        () async {
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"struktur": "berubah"}')),
+      );
+      service.sessionProvider = () async => _session();
+
+      // Validasi berbasis status: isi respons tidak perlu diparse.
+      expect(await service.validateSession(), isTrue);
+      // Nama akun tetap best-effort: null bila tidak ditemukan.
+      expect(await service.fetchAccountName(), isNull);
+      service.dispose();
+    });
+
+    test('false saat HTTP 401 atau 403', () async {
+      final YouTubeMusicService unauthorized = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"error": "unauthorized"}', 401)),
+      );
+      unauthorized.sessionProvider = () async => _session();
+      expect(await unauthorized.validateSession(), isFalse);
+      unauthorized.dispose();
+
+      final YouTubeMusicService forbidden = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"error": "forbidden"}', 403)),
+      );
+      forbidden.sessionProvider = () async => _session();
+      expect(await forbidden.validateSession(), isFalse);
+      forbidden.dispose();
+    });
+
+    test('false saat request gagal (kesalahan jaringan)', () async {
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            throw Exception('jaringan putus')),
+      );
+      service.sessionProvider = () async => _session();
+      expect(await service.validateSession(), isFalse);
+      service.dispose();
+    });
+
+    test('authUser kosong tanpa X-Goog-AuthUser; dataSyncId kosong tanpa '
+        'context.user', () async {
+      final List<http.Request> requests = <http.Request>[];
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          requests.add(request);
+          return _jsonResponse(_accountMenuJson);
+        }),
+      );
+      service.sessionProvider = () async => YoutubeSession(
+            cookie: _validCookie,
+            dataSyncId: '',
+            authUser: '',
+            visitorData: 'visitor-1',
+            clientVersion: '1.20250101.01.00',
+          );
+
+      expect(await service.validateSession(), isTrue);
+
+      expect(requests, hasLength(1));
+      expect(requests[0].url.path, '/youtubei/v1/account/account_menu');
+      expect(requests[0].headers.containsKey('x-goog-authuser'), isFalse);
+      expect(requests[0].headers.containsKey('x-goog-visitor-id'), isTrue);
+      final Map<String, dynamic> body =
+          jsonDecode(requests[0].body) as Map<String, dynamic>;
+      expect(
+        (body['context'] as Map<String, dynamic>).containsKey('user'),
+        isFalse,
+      );
+      service.dispose();
+    });
+  });
 }

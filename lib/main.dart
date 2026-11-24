@@ -52,13 +52,14 @@ class _StartupState extends State<_Startup> {
       api = SonoraApi(settings);
       ytService = YouTubeMusicService();
       // Sesi YouTube Music: cookie disimpan terenkripsi dan dipulihkan saat
-      // startup (non-fatal bila gagal). Validator memeriksa kandidat sesi
-      // lewat account_menu sebelum sesi dijadikan aktif.
+      // startup (non-fatal bila gagal). Validator berbasis status HTTP
+      // account_menu — bukan parsing nama akun — agar perubahan bentuk
+      // respons Google tidak menolak sesi yang masih valid.
       final YouTubeMusicService music = ytService;
       final YoutubeAuthService authService = YoutubeAuthService(
         store: const FlutterSecureSessionStore(),
-        validate: (YoutubeSession session) async =>
-            await music.fetchAccountName(session: session) != null,
+        validate: (YoutubeSession session) =>
+            music.validateSession(session: session),
         fetchAccountName: (YoutubeSession session) =>
             music.fetchAccountName(session: session),
       );
