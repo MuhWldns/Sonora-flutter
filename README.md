@@ -5,7 +5,7 @@
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-Klien musik Android modern berbasis Flutter dengan arsitektur **mandiri (*standalone-first*)** yang dapat mencari dan memutar lagu langsung dari CDN YouTube (ala BitChord), serta mendukung integrasi opsional ke proxy backend mandiri (*self-hosted*) [Sonora Music](https://github.com/MuhWldns/Sonora-Music).
+Klien musik Android modern berbasis Flutter dengan arsitektur **mandiri (*standalone-first*)** yang dapat mencari dan memutar lagu langsung dari CDN YouTube, serta mendukung integrasi opsional ke Add-on proxy backend mandiri (*self-hosted*) [Sonora Music](https://github.com/MuhWldns/Sonora-Music).
 
 Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bersih, cepat, dan independen. Klien Flutter menangani antarmuka pengguna, pencarian audio mandiri, serta pemutaran audio native di Android melalui stream langsung GoogleVideo CDN tanpa membutuhkan perantara server wajib.
 

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<title>Sonora · Full Player Lirik (light)</title>
+<style>
+  :root {
+    --canvas: #eef1f2; --base: #fafbfb; --clow: #f0f3f4; --cont: #e3e8ea;
+    --chigh: #d9dfe1; --chighest: #c3cccf;
+    --glow: rgba(224, 58, 62, 0.14);
+    --t1: #141c21; --t2: #51616b; --t3: #8a97a0;
+  }
+  .lyr-bg {
+    position: absolute; inset: -48px; z-index: 0;
+    background: url('https://picsum.photos/seed/sonora-album1/900/1600') center / cover no-repeat;
+    filter: blur(46px) saturate(1.05) brightness(1.06);
+  }
+  .lyr-scrim {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(250,251,251,0.55) 0%, rgba(250,251,251,0.62) 45%, rgba(250,251,251,0.94) 100%);
+  }
+  .statusbar { color: var(--t1); position: relative; z-index: 3; }
+  .topbar .ms { color: var(--t1); }
+  .lyr-wrap { z-index: 3; }
+  .lyr-wrap::before { background: linear-gradient(rgba(250,251,251,0.55), transparent); }
+  .lyr-wrap::after { background: linear-gradient(transparent, rgba(250,251,251,0.94)); }
+  .lyr .line { color: rgba(20, 28, 33, 0.42); padding: 10px 14px; }
+  .lyr .line.near { color: rgba(20, 28, 33, 0.68); }
+  .lyr .line.active {
+    font-size: 27px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent);
+    background: none; border: none; box-shadow: none;
+    padding: 10px 14px;
+    margin: 8px 0;
+    animation: glassIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .fp-compact { position: relative; z-index: 3; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen" style="background:var(--base)">
+    <div class="lyr-bg"></div>
+    <div class="lyr-scrim"></div>
+    <div class="statusbar"><span>9:41</span><span class="sysicons"><span class="ms">signal_cellular_alt</span><span class="ms">wifi</span><span class="ms">battery_full</span></span></div>
+    <div class="topbar">
+      <span class="ms">keyboard_arrow_down</span>
+      <span style="display:flex;gap:2px"><span class="ms">queue_music</span><span class="ms">more_vert</span></span>
+    </div>
+    <div class="lyr-wrap">
+      <div class="lyr">
+        <div class="line">Kau hadir dalam sunyi malamku</div>
+        <div class="line near">Menemani langkah yang lelah</div>
+        <div class="line active">Dan jauh terasa dekat</div>
+        <div class="line near">Hingga waktu ikut berhenti</div>
+        <div class="line">Menulis kisah yang tersisa</div>
+        <div class="line">Selamanya bersamamu</div>
+        <div class="line">Di bawah langit yang sama</div>
+      </div>
+    </div>
+    <div class="fp-compact">
+      <div class="meta">
+        <div class="ttl">Daylight</div>
+        <div class="sub">Joji</div>
+      </div>
+      <div class="track">
+        <div class="fill" style="width:34%"></div>
+        <div class="thumb" style="left:34%"></div>
+      </div>
+      <div class="times"><span class="mono-t">1:06</span><span class="mono-t">2:58</span></div>
+      <div class="row">
+        <span class="ms">skip_previous</span>
+        <button class="play"><span class="ms">pause</span></button>
+        <span class="ms">skip_next</span>
+      </div>
+    </div>
+  </div></div>
+</div>
+<script>
+  // Demo: baris aktif berganti setiap 4 detik agar fade in/out kartu kaca terlihat.
+  const lines = Array.from(document.querySelectorAll('.lyr .line'));
+  let cur = 2;
+  function setActive(n) {
+    lines.forEach((el, k) => {
+      el.classList.remove('active', 'near');
+      if (k === n) el.classList.add('active');
+      else if (Math.abs(k - n) === 1) el.classList.add('near');
+    });
+  }
+  setActive(cur);
+  setInterval(() => { cur = (cur + 1) % lines.length; setActive(cur); }, 4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dokumentasi Kode Sonora-Flutter — Panduan untuk Junior Developer</title>
+  <style>
+    :root {
+      --bg: #0a0f12;
+      --surface: #171c1f;
+      --surface-light: #262d32;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --amber: #e03a3e;
+      --amber-dark: #b91c1c;
+      --amber-light: #f87171;
+      --border: #262d32;
+      --code-bg: #06090b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --info: #38bdf8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    nav.sidebar {
+      width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 16px;
+      flex-shrink: 0;
+    }
+    nav.sidebar h2 {
+      font-size: 1.1rem;
+      color: var(--amber-light);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    nav.sidebar .tagline {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+    nav.sidebar ul {
+      list-style: none;
+    }
+    nav.sidebar li {
+      margin-bottom: 4px;
+    }
+    nav.sidebar a {
+      color: var(--text-muted);
+      text-decoration: none;
+      display: block;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: all 0.15s ease;
+    }
+    nav.sidebar a:hover {
+      background: var(--surface-light);
+      color: #fff;
+    }
+    nav.sidebar a.section-title {
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-top: 14px;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    main.content {
+      flex: 1;
+      padding: 40px 48px;
+      max-width: 980px;
+    }
+    header.doc-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+    }
+    h1 {
+      font-size: 2.2rem;
+      color: var(--amber);
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-size: 1.5rem;
+      color: #fff;
+      margin: 40px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h3 {
+      font-size: 1.15rem;
+      color: var(--amber-light);
+      margin: 28px 0 12px;
+    }
+    h4 {
+      font-size: 1rem;
+      color: #cbd5e1;
+      margin: 18px 0 8px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #cbd5e1;
+    }
+    ul, ol {
+      margin: 0 0 18px 24px;
+      color: #cbd5e1;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88em;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--amber-light);
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: #e2e8f0;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .callout {
+      border-left: 4px solid var(--amber);
+      background: rgba(245, 158, 11, 0.08);
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin: 18px 0;
+    }
+    .callout.info {
+      border-left-color: var(--info);
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .callout.danger {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0 24px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: var(--surface);
+      color: #fff;
+    }
+    tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      border-radius: 9999px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.amber { background: var(--amber); color: #000; }
+    .badge.blue { background: var(--info); color: #000; }
+    .badge.green { background: var(--success); color: #fff; }
+    .badge.red { background: var(--danger); color: #fff; }
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; }
+      nav.sidebar { width: 100%; height: auto; position: static; }
+      main.content { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <h2>🎵 Sonora Flutter</h2>
+    <div class="tagline">Panduan Kode untuk Junior Dev</div>
+    <ul>
+      <li><a href="#overview">1. Gambaran Umum</a></li>
+      <li><a href="#architecture">2. Arsitektur & PO Token</a></li>
+      <li><a href="#entry-point">3. Titik Masuk (main.dart)</a></li>
+      
+      <li><a class="section-title">Data Layer</a></li>
+      <li><a href="#music-models">music_models.dart</a></li>
+      <li><a href="#settings-store">settings_store.dart</a></li>
+      <li><a href="#sonora-api">sonora_api.dart</a></li>
+      <li><a href="#youtube-music-service">youtube_music_service.dart</a></li>
+      <li><a href="#lyrics-store">lyrics_store.dart</a></li>
+      <li><a href="#audio-cache-service">audio_cache_service.dart</a></li>
+      <li><a href="#local-database">local_database.dart (7 Tabel SQLite)</a></li>
+      <li><a class="section-title">Playback Layer</a></li>
+      <li><a href="#audio-handler">sonora_audio_handler.dart</a></li>
+      <li><a href="#android-native">Android Native & Service</a></li>
+
+      <li><a class="section-title">UI Layer</a></li>
+      <li><a href="#sonora-app">sonora_app.dart & theme.dart</a></li>
+      <li><a href="#app-scope">app_scope.dart</a></li>
+      <li><a href="#root-shell">root_shell.dart</a></li>
+      <li><a href="#player-controller">player_controller.dart</a></li>
+      <li><a href="#player-chrome">player_chrome.dart</a></li>
+      <li><a href="#screens">Screens (Home, Search, Browse, Library, Settings)</a></li>
+
+      <li><a class="section-title">Tips & Gotchas</a></li>
+      <li><a href="#gotchas">Hal Penting & Jebakan Kode</a></li>
+    </ul>
+  </nav>
+
+  <!-- CONTENT -->
+  <main class="content">
+    <header class="doc-header">
+      <h1>Dokumentasi Kode Sonora-Flutter</h1>
+      <p>Panduan lengkap struktur arsitektur, cara kerja logika baris demi baris, dan komponen UI aplikasi pemutar musik Sonora. Didesain ramah untuk pengembang tingkat pemula (junior developer).</p>
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <span class="badge amber">Flutter 3.44+</span>
+        <span class="badge blue">Dart 3.12+</span>
+        <span class="badge green">Android Native Media3</span>
+      </div>
+    </header>
+
+    <!-- 1. GAMBARAN UMUM -->
+    <section id="overview">
+      <h2>1. Gambaran Umum Proyek</h2>
+      <p>Sonora-flutter adalah aplikasi klien musik pribadi berbasis YouTube Music dengan pendekatan <strong>Standalone-First</strong>. Aplikasi dapat memutar musik secara langsung dari YouTube tanpa server eksternal, sekaligus menyediakan dukungan opsional untuk <strong>Proxy Sonora (Node.js)</strong>.</p>
+      <p>Aplikasi ini memiliki prinsip <strong>Pemisahan Tugas Bersih (Clean Separation of Concerns)</strong>:</p>
+      <ul>
+        <li><strong>Playback Mandiri (Standalone Direct)</strong>: Menggunakan <code>youtube_explode_dart</code> untuk ekstraksi metadata dan resolusi stream audio langsung dari CDN GoogleVideo tanpa konfigurasi server.</li>
+        <li><strong>Proxy Sonora (Backend Node.js Opsional)</strong>: Mendukung koneksi ke instance proxy self-hosted untuk endpoint <code>/home</code>, <code>/search</code>, dan <code>/browse</code> terpusat.</li>
+        <li><strong>Sonora Flutter (Client Android)</strong>: Menampilkan antarmuka <em>Nocturne Audio</em> dengan aksen Crimson, mengelola antrean lagu, mendukung lirik sinkron via LRCLIB, dan memutar audio native di latar belakang via Android Media Session.</li>
+      </ul>
+    </section>
+
+    <!-- 2. ARSITEKTUR & STREAMING LANGSUNG -->
+    <section id="architecture">
+      <h2>2. Arsitektur & Jalur Audio</h2>
+      <div class="card">
+        <pre><code>[Flutter UI] ---> [SonoraAudioHandler (just_audio)] ---> [LockCachingAudioSource]
+     │                                                               │ (Audio M4A / Opus)
+     │ (Resolusi Direct / Fallback Proxy)                            ▼
+     ├──> [YouTubeMusicService] ==========================> [CDN GoogleVideo]
+     │                                                               │ (Range Request 206)
+     └──> [SonoraApi (Opsional)] ---> [Sonora Node Proxy]             │
+</code></pre>
+      </div>
+
+      <div class="callout info">
+        <strong>💡 Bagaimana client memutar audio tanpa server proxy?</strong>
+        <p>Aplikasi mengurai <code>StreamManifest</code> menggunakan <code>youtube_explode_dart</code> langsung di perangkat dan memprioritaskan stream audio berkualitas tinggi. Pemutar audio menggunakan mekanisme caching lokal (<code>LockCachingAudioSource</code>) untuk pre-buffering sehingga audio diputar mulus tanpa gangguan latensi jaringan.</p>
+      </div>
+    </section>
+
+    <!-- 3. MAIN.DART -->
+    <section id="entry-point">
+      <h2>3. Titik Masuk: <code>lib/main.dart</code></h2>
+      <p>File ini adalah fondasi awal saat aplikasi dibuka. Bertugas melakukan <em>bootstrapping</em> asinkron sebelum widget utama ditampilkan.</p>
+
+      <div class="card">
+        <h4>Baris Penting & Penjelasannya:</h4>
+        <pre><code>// 1. Memastikan engine Flutter siap sebelum operasi asinkron native dijalankan
+WidgetsFlutterBinding.ensureInitialized();
+
+// 2. _initialize() di _StartupState:
+settings = await SettingsStore.load();      // Memuat preferensi proxy dari storage
+api = SonoraApi(settings);                  // Menyiapkan klien HTTP
+final audio = await SonoraAudioHandler.initialize(api); // Memulai AudioService Android native
+
+// 3. Jika audio berhasil siap:
+return SonoraApp(settings: _settings!, api: _api!, audio: _audio!);
+
+// 4. Jika gagal (misal izin sistem atau audio service error):
+// Menampilkan layar fallback ramah pengguna dengan tombol "Coba lagi", BUKAN crash putih!
+</code></pre>
+      </div>
+    </section>
+
+    <!-- DATA LAYER -->
+    <section id="music-models">
+      <h2>4. Data Layer: <code>lib/data/music_models.dart</code></h2>
+      <p>Menyimpan representasi objek data musik yang diterima dari proxy. Menggunakan pola <strong>Parsing Toleran</strong>: jika YouTube mengubah format JSON atau ada field bernilai null, aplikasi tidak akan crash.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Class / Properti</th>
+            <th>Tipe</th>
+            <th>Fungsi & Logika</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>MusicItem</code></td>
+            <td>Class (Immutable)</td>
+            <td>Merepresentasikan satu lagu, video, album, playlist, atau artis.</td>
+          </tr>
+          <tr>
+            <td><code>isPlayable</code></td>
+            <td>Getter <code>bool</code></td>
+            <td>Mengembalikan <code>true</code> HANYA jika <code>videoId</code> ada dan tidak kosong. Digunakan untuk menyaring item mana yang bisa diklik play.</td>
+          </tr>
+          <tr>
+            <td><code>artist</code></td>
+            <td>Getter <code>String</code></td>
+            <td><strong>Hierarki fallback cerdas:</strong> Jika daftar <code>artists[]</code> ada, digabung dengan koma (mis. <em>"Artist A, Artist B"</em>). Jika kosong, menggunakan teks <code>subtitle</code>. Jika tetap kosong, mengembalikan string kosong <code>""</code>.</td>
+          </tr>
+          <tr>
+            <td><code>browseTarget</code></td>
+            <td>Getter <code>String?</code></td>
+            <td>Menentukan ID untuk membuka detail. Jika ada <code>browseId</code> (album/artis), dipakai langsung. Jika adanya <code>playlistId</code>, otomatis dinormalkan dengan awalan kanonik <code>VL</code>.</td>
+          </tr>
+          <tr>
+            <td><code>MusicSection</code></td>
+            <td>Class</td>
+            <td>Mewakili satu rak/koleksi (misalnya rak "Quick picks" atau "Trending") yang berisi <code>title</code> dan <code>List&lt;MusicItem&gt; items</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="settings-store">
+      <h2>5. Data Layer: <code>lib/data/settings_store.dart</code></h2>
+      <p>Mengelola pengaturan URL proxy lokal menggunakan <code>SharedPreferences</code>. Mengikuti aturan keamanan ketat: tidak ada password/cookie rahasia yang disimpan.</p>
+
+      <div class="card">
+        <h4>Alur Logika & Aturan Validasi:</h4>
+        <ul>
+          <li><strong>Persist-First</strong>: Data ditulis ke disk terlebih dahulu (<code>prefs.setString</code>). Jika disk gagal/penuh, exception dilempar, state memori <strong>TIDAK</strong> diubah, dan UI tidak dibohongi dengan status "sukses palsu".</li>
+          <li><strong>Sanitasi URL (<code>normalizeProxyBase</code>)</strong>:
+            <ul>
+              <li>Hanya menerima skema <code>http://</code> atau <code>https://</code>.</li>
+              <li>Menolak kredensial di URL (misal <code>http://user:pass@host</code>).</li>
+              <li>Menolak query string (<code>?foo=bar</code>) atau fragment (<code>#section</code>).</li>
+              <li>Menghapus garis miring berlebih di akhir (misal <code>http://host///</code> &rarr; <code>http://host</code>).</li>
+              <li>Mempertahankan subpath (misal <code>http://host/sub/api</code> tetap utuh).</li>
+            </ul>
+          </li>
+          <li><strong>Pembersihan Bersih</strong>: Mengosongkan URL akan menyimpan string kosong <code>""</code>, bukan menghapus key. Ini mencegah nilai bawaan build (<code>--dart-define</code>) muncul kembali secara tidak diinginkan setelah pengguna sengaja mengosongkannya.</li>
+          <li><strong>Persistensi Draf (<code>sonora.proxyDraft</code>)</strong>: Ketika toggle Add-on dimatikan, <code>proxyBase</code> dikosongkan agar aplikasi beroperasi dalam mode mandiri, namun alamat URL tetap tersimpan sebagai draf dan otomatis terisi kembali saat toggle diaktifkan.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="sonora-api">
+      <h2>6. Data Layer: <code>lib/data/sonora_api.dart</code></h2>
+      <p>Klien HTTP yang mengirimkan permintaan ke proxy Sonora.</p>
+
+      <div class="card">
+        <h4>Fungsi-Fungsi Utama:</h4>
+        <pre><code>// 1. Mengambil feed beranda (Quick picks, dsb)
+Future&lt;List&lt;MusicSection&gt;&gt; home();
+
+// 2. Pencarian dengan filter kategori opsional (song, video, album, playlist)
+Future&lt;List&lt;MusicSection&gt;&gt; search(String query, {String? filter});
+
+// 3. Mengambil daftar lagu dari album atau playlist
+Future&lt;List&lt;MusicSection&gt;&gt; browse(String id);
+
+// 4. Uji koneksi: Memastikan HTTP 200 DAN JSON memuat {"ok": true}
+Future&lt;void&gt; checkConnection(String base);
+
+// 5. Membuat URI stream relay ke proxy
+Uri streamUri(String videoId);
+</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>🔒 Mengapa ada fungsi <code>_captureBase()</code>?</strong>
+        <p>Ketika pengguna menekan tombol Search, URL proxy aktif langsung ditangkap saat request <em>dimulai</em>. Jika pengguna membuka Pengaturan dan mengganti URL proxy saat pencarian masih berjalan di latar belakang, hasil pencarian lama tidak akan merusak request baru karena base URL sudah terkunci sejak awal.</p>
+      </div>
+    </section>
+
+    <section id="youtube-music-service">
+      <h2>6b. Data Layer: <code>lib/data/youtube_music_service.dart</code></h2>
+      <p>Layanan ekstraksi YouTube langsung di sisi klien menggunakan pustaka <code>youtube_explode_dart</code>. Memungkinkan pemutaran dan pencarian mandiri tanpa ketergantungan pada server proxy.</p>
+
+      <div class="card">
+        <h4>Fungsi-Fungsi Utama:</h4>
+        <pre><code>// 1. Mengambil direct stream URI dengan bitrate audio tertinggi (M4A / Opus)
+Future&lt;Uri?&gt; resolveStreamUri(String videoId);
+
+// 2. Pencarian lagu langsung dari YouTube
+Future&lt;List&lt;MusicItem&gt;&gt; search(String query);
+
+// 3. Mengambil daftar lagu trending langsung dari feed YouTube
+Future&lt;List&lt;MusicItem&gt;&gt; getTrending();
+
+// 4. Mengambil koleksi lagu playlist YouTube hingga 50 trek atau fallback pencarian
+Future&lt;List&lt;MusicSection&gt;&gt; browse(String browseId, {String? title, String? type, int limit = 50});
+</code></pre>
+        <ul>
+          <li><strong>Stream Resolution Bebas 403</strong>: Memprioritaskan stream audio berkualitas tinggi yang dapat diakses langsung oleh Android ExoPlayer dengan respon <code>206 Partial Content</code>.</li>
+          <li><strong>Memory Caching (4 Jam)</strong>: Menyimpan cache URI stream selama 4 jam untuk menghindari overhead panggilan manifest berulang ke YouTube.</li>
+          <li><strong>Dukungan Browse Mandiri</strong>: Membaca trek playlist YouTube secara langsung via <code>_yt.playlists.getVideos()</code> atau fallback cerdas via <code>search()</code> tanpa dependensi proxy.</li>
+          <li><strong>Dispose Safety</strong>: Mengimplementasikan <code>dispose()</code> aman untuk membebaskan koneksi HTTP client <code>YoutubeExplode</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="lyrics-store">
+      <h2>6c. Data Layer: <code>lib/data/lyrics_store.dart</code></h2>
+      <p>Penyedia lirik tersinkronisasi (*synced lyrics*) yang mengambil data langsung dari LRCLIB tanpa melalui server proxy.</p>
+
+      <div class="card">
+        <h4>Kemampuan & Pola Ketahanan:</h4>
+        <ul>
+          <li><code>fetchLyrics({required String title, required String artist, int? durationSeconds})</code>: Mencari lirik sinkron berdasarkan judul dan artis lagu.</li>
+          <li><code>LyricsRepository.parseSynced(String lrc)</code>: Mengurai string format LRC menjadi daftar pasangan waktu (*timestamp*) dan baris lirik.</li>
+          <li><strong>Graceful Degradation</strong>: Kegagalan jaringan atau ketiadaan lirik selalu mengembalikan <code>null</code> secara aman dan tidak pernah melempar pengecualian (*never throws*).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="audio-cache-service">
+      <h2>6d. Data Layer: <code>lib/data/audio_cache_service.dart</code></h2>
+      <p>Layanan pengelolaan cache berkas stream audio pada penyimpanan lokal perangkat (direktori temporary sistem).</p>
+
+      <div class="card">
+        <h4>Fungsi-Fungsi Utama:</h4>
+        <pre><code>// 1. Menghitung ukuran total berkas cache audio di disk
+Future&lt;int&gt; getCacheSizeBytes();
+
+// 2. Membersihkan seluruh berkas cache audio secara manual
+Future&lt;void&gt; clearCache();
+
+// 3. Pemangkasan otomatis LRU (batas 500 MB, dipangkas ke 400 MB)
+Future&lt;void&gt; pruneCache({int maxBytes, int targetBytes});
+
+// 4. Formatter ukuran byte ke string terbaca (B, KB, MB, GB)
+String formatBytes(int bytes);
+</code></pre>
+        <ul>
+          <li><strong>Pembersihan Otomatis LRU</strong>: Dijalankan saat startup aplikasi dan setelah antrean lagu dimuat. Bila ukuran cache melebihi 500 MB, sistem memangkas berkas yang paling lama tidak diakses (*Least Recently Used*) hingga tersisa 400 MB.</li>
+          <li><strong>Pembersihan Manual</strong>: Tersedia tombol pembersih di layar Pengaturan disertai visualisasi progress bar penggunaan memori real-time.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- LOCAL DATABASE (7 TABLES) -->
+    <section id="local-database">
+      <h2>7. Local Storage: <code>lib/data/local_database.dart</code> (7 Tabel SQLite)</h2>
+      <p>Menggunakan SQLite native via paket <code>sqflite</code> untuk menyimpan data offline lokal di perangkat pengguna. Terdiri dari 7 tabel fisik yang mencakup 5 domain modul:</p>
+
+      <div class="card">
+        <h3>Tabel 1: <code>playback_history</code> (Riwayat Lagu yang Diputar)</h3>
+        <p>Mencatat setiap lagu yang pernah diputar di aplikasi untuk fitur "Recently Played".</p>
+        <pre><code>CREATE TABLE playback_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  thumbnail TEXT,
+  duration TEXT,
+  played_at INTEGER NOT NULL -- timestamp Unix epoch (ms)
+);
+CREATE INDEX idx_playback_history_played_at ON playback_history(played_at DESC);
+CREATE INDEX idx_playback_history_video_id ON playback_history(video_id);
+</code></pre>
+        <ul>
+          <li><code>recordPlayback(MusicItem item)</code>: Menambahkan riwayat putar dengan batas maksimal 100 entri terbaru (*auto-capping*).</li>
+          <li><code>getRecentPlaybacks({int limit = 20})</code>: Mengambil daftar lagu terakhir diputar.</li>
+          <li><code>clearPlaybackHistory()</code>: Mengosongkan seluruh riwayat pemutaran.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Tabel 2: <code>favorite_tracks</code> (Daftar Lagu Favorit Lokal)</h3>
+        <p>Menyimpan lagu-lagu yang ditandai favorit (disukai) secara offline.</p>
+        <pre><code>CREATE TABLE favorite_tracks (
+  video_id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  thumbnail TEXT,
+  duration TEXT,
+  added_at INTEGER NOT NULL
+);
+CREATE INDEX idx_favorite_tracks_added_at ON favorite_tracks(added_at DESC);
+</code></pre>
+        <ul>
+          <li><code>addFavorite(MusicItem item)</code>: Menyimpan lagu favorit (ConflictAlgorithm.replace).</li>
+          <li><code>removeFavorite(String videoId)</code>: Menghapus lagu dari favorit.</li>
+          <li><code>isFavorite(String videoId)</code>: Mengecek status favorit lagu.</li>
+          <li><code>getFavorites({int limit = 50})</code>: Mengambil daftar lagu favorit.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Tabel 3: <code>search_history</code> (Riwayat Pencarian & Frekuensi)</h3>
+        <p>Menyimpan kata kunci pencarian yang pernah diketik pengguna beserta frekuensinya.</p>
+        <pre><code>CREATE TABLE search_history (
+  query TEXT PRIMARY KEY,
+  filter TEXT,
+  searched_at INTEGER NOT NULL,
+  search_count INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_search_history_searched_at ON search_history(searched_at DESC);
+</code></pre>
+        <ul>
+          <li><code>recordSearch(String query, {String? filter})</code>: Menyimpan pencarian dengan auto-capping 30 entri.</li>
+          <li><code>getRecentSearches({int limit = 10})</code>: Mengambil kata kunci pencarian terbaru.</li>
+          <li><code>deleteSearch(String query)</code> & <code>clearSearchHistory()</code>: Menghapus riwayat pencarian.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Tabel 4 & 5: <code>user_playlists</code> & <code>playlist_tracks</code> (Playlist Lokal)</h3>
+        <p>Menyimpan playlist kustom buatan pengguna beserta relasi lagu di dalamnya.</p>
+        <pre><code>CREATE TABLE user_playlists (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  artwork_url TEXT,
+  artwork_path TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE playlist_tracks (
+  playlist_id TEXT NOT NULL,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL DEFAULT '',
+  thumbnail TEXT,
+  duration TEXT,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (playlist_id, video_id),
+  FOREIGN KEY (playlist_id) REFERENCES user_playlists(id) ON DELETE CASCADE
+);
+</code></pre>
+        <ul>
+          <li><code>createPlaylist(id, name)</code> & <code>updatePlaylist(...)</code>: Mengelola identitas playlist, deskripsi, dan cover art lokal/URL.</li>
+          <li><code>addTrackToPlaylist(playlistId, track)</code> & <code>removeTrackFromPlaylist(...)</code>: Mengelola lagu di playlist.</li>
+          <li><code>deletePlaylist(id)</code>: Menghapus playlist dengan kaskade penghapusan otomatis lagu-lagunya (ON DELETE CASCADE).</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Tabel 6: <code>saved_collections</code> (Koleksi Album & Playlist Tersimpan)</h3>
+        <p>Menyimpan album atau playlist dari YouTube yang disimpan pengguna ke perpustakaan offline.</p>
+        <pre><code>CREATE TABLE saved_collections (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,          -- 'album' atau 'playlist'
+  title TEXT NOT NULL,
+  browse_id TEXT,
+  thumbnail TEXT,
+  added_at INTEGER NOT NULL
+);
+CREATE INDEX idx_saved_collections_type ON saved_collections(type, added_at DESC);
+</code></pre>
+        <ul>
+          <li><code>saveCollection(MusicItem item)</code>: Menyimpan koleksi album/playlist.</li>
+          <li><code>isCollectionSaved(String id)</code> & <code>removeCollection(String id)</code>: Cek dan hapus koleksi tersimpan.</li>
+          <li><code>getSavedCollections(String type)</code>: Mengambil semua koleksi berdasarkan tipenya.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Tabel 7: <code>listening_logs</code> (Wawasan & Statistik Mendengarkan)</h3>
+        <p>Mencatat durasi riil pemutaran lagu setiap kali diputar minimal 15 detik untuk menghasilkan analitik.</p>
+        <pre><code>CREATE TABLE listening_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL DEFAULT '',
+  thumbnail TEXT,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  listened_seconds INTEGER NOT NULL DEFAULT 0,
+  played_at INTEGER NOT NULL
+);
+CREATE INDEX idx_listening_logs_played_at ON listening_logs(played_at DESC);
+CREATE INDEX idx_listening_logs_video ON listening_logs(video_id);
+CREATE INDEX idx_listening_logs_artist ON listening_logs(artist);
+</code></pre>
+        <ul>
+          <li><code>recordListeningLog(...)</code>: Mencatat sesi dengar jika durasi dengar riil mencapai ambang batas.</li>
+          <li><code>getListeningStats({int? sinceTimestamp})</code>: Menghasilkan objek agregasi <code>ListeningStats</code> (total menit, total plays, top tracks, dan top artists) dalam rentang waktu yang dipilih (1 minggu, 1 bulan, 1 tahun, dsb).</li>
+        </ul>
+      </div>
+
+      <div class="callout info">
+        <strong>💡 Tips Pengujian SQLite (In-Memory Database)</strong>
+        <p>Di unit test (<code>test/database_test.dart</code>), kita menggunakan paket <code>sqflite_common_ffi</code> dengan database in-memory (<code>inMemoryDatabasePath</code>). Database dibuat di memori RAM dan dibersihkan saat test selesai, sehingga tes berjalan sangat cepat (&lt;1 detik) tanpa mengotori filesystem perangkat.</p>
+      </div>
+    </section>
+
+    <!-- PLAYBACK LAYER -->
+    <section id="audio-handler">
+      <h2>8. Playback Layer: <code>lib/playback/sonora_audio_handler.dart</code></h2>
+      <p>Jantung pemutar audio native. Menjembatani paket <code>just_audio</code> dengan <code>audio_service</code> agar sistem Android mengenali aplikasi sebagai pemutar musik resmi.</p>
+
+      <div class="card">
+        <h4>Fitur & Arsitektur Playback:</h4>
+        <ol>
+          <li>
+            <strong>Antrean Native (ConcatenatingAudioSource)</strong>:
+            Pemutar menyerahkan perpindahan lagu otomatis (*auto-advance*) ke engine playlist native `just_audio`. Kita tidak perlu membuat timer manual atau memanggil "next" saat lagu selesai.
+          </li>
+          <li>
+            <strong>Serialisasi Permintaan (<code>_enqueue</code>)</strong>:
+            Jika pengguna menekan lagu A lalu dengan cepat menekan lagu B, fungsi <code>_enqueue</code> memastikan urutan loading dieksekusi teratur tanpa balapan (*race condition*).
+          </li>
+          <li>
+            <strong>Generasi Request (<code>_generation</code>)</strong>:
+            Setiap kali antrean diganti atau tombol stop ditekan, angka <code>_generation</code> dinaikkan. Jika ada loading lagu lama yang baru selesai beberapa milidetik kemudian, lagu lama akan dibatalkan (*dropped*) karena nomor generasinya sudah basi.
+          </li>
+          <li>
+            <strong>Pemisahan Lifecycle <code>play()</code></strong>:
+            <em>Critical bug fix!</em> Di library <code>just_audio</code>, pemanggilan <code>await player.play()</code> baru akan selesai (complete) saat lagu <strong>berhenti/dijeda/selesai</strong>. Oleh karena itu, <code>playItems()</code> tidak boleh me-<code>await</code> fungsi <code>play()</code> di dalam antrean loading, melainkan menjalankannya sebagai aksi independen (*fire-and-forget* aman) agar antrean tidak macet selama durasi lagu.
+          </li>
+          <li>
+            <strong>Audio Interruption & Becoming Noisy</strong>:
+            Menggunakan <code>audio_session</code>: jika ada panggilan telepon masuk, volume otomatis mengecil (ducking) atau dijeda (pause). Jika kabel headphone dicabut, musik otomatis berhenti seketika.
+          </li>
+          <li>
+            <strong>Native AudioSource & Dekopling ID MediaItem</strong>:
+            Stream audio dimuat menggunakan <code>AudioSource.uri(uri, headers: {'User-Agent': ...})</code> native Android Media3 ExoPlayer (<code>DefaultHttpDataSource</code>). ID kanonik <code>MediaItem</code> disetel langsung ke <code>item.videoId!</code>, mengeliminasi total ketergantungan pemanggilan stream proxy dan mencegah eksepsi fatal <code>SonoraConfigurationException</code>.
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="android-native">
+      <h2>9. Android Native Integration</h2>
+      <ul>
+        <li><code>AndroidManifest.xml</code>:
+          <ul>
+            <li>Izin <code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_MEDIA_PLAYBACK</code>, dan <code>WAKE_LOCK</code>.</li>
+            <li>Pendaftaran Service <code>com.ryanheise.audioservice.AudioService</code> dengan intent filter <code>MediaBrowserService</code>.</li>
+            <li>Pendaftaran BroadcastReceiver <code>MediaButtonReceiver</code> untuk tombol headset.</li>
+            <li><code>android:usesCleartextTraffic="true"</code>: Memungkinkan operator mengakses proxy lokal melalui HTTP (meskipun HTTPS tetap direkomendasikan).</li>
+          </ul>
+        </li>
+        <li><code>MainActivity.kt</code>:
+          <pre><code>// Mengubah turunan dari FlutterActivity menjadi AudioServiceActivity:
+class MainActivity : AudioServiceActivity()
+// Ini memastikan Service latar belakang dan UI Flutter berbagi satu engine yang sama tanpa boros memori!</code></pre>
+        </li>
+      </ul>
+    </section>
+
+    <!-- UI LAYER -->
+    <section id="sonora-app">
+      <h2>10. UI: <code>sonora_app.dart</code> & <code>theme.dart</code></h2>
+      <div class="card">
+        <ul>
+          <li><strong>Desain Nocturne Audio & Aksen Crimson (<code>#E03A3E</code>)</strong>: Tema dark-first atmosferik dengan aksen tunggal crimson khas Sonora pada tombol utama, slider, dan sorotan aktif. Tipografi modern menggunakan <strong>Plus Jakarta Sans</strong>.</li>
+          <li><strong>Hierarki Surface Material 3</strong>: Menggunakan <code>ColorScheme.surfaceContainer*</code> (canvas <code>#0A0F12</code> &rarr; base <code>#0F1417</code> &rarr; containers <code>#171C1F</code> / <code>#1D2327</code>) serta ThemeExtension <code>SonoraColors</code> untuk komponen frosted glass (<code>GlassContainer</code>).</li>
+          <li><strong>Ukuran Sentuh Android</strong>: Semua tombol interaktif memiliki target sentuh minimal 48dp untuk kenyamanan jari pengguna di layar sentuh.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="app-scope">
+      <h2>11. UI: <code>app_scope.dart</code></h2>
+      <pre><code>// Contoh penggunaan di sembarang widget anak:
+final scope = SonoraScope.of(context);
+scope.api.search('query');
+scope.player.togglePlayPause();
+scope.tabs.goTo(AppTabs.settings);
+</code></pre>
+    </section>
+
+    <section id="root-shell">
+      <h2>12. UI: <code>root_shell.dart</code> & Navigasi</h2>
+      <ul>
+        <li><code>IndexedStack</code>: Menampung 4 tab (Beranda, Cari, Koleksi/Perpustakaan, Pengaturan). Berbeda dengan mengganti widget biasa, <code>IndexedStack</code> <strong>menjaga state layar tetap hidup</strong> (posisi scroll, filter, atau teks pencarian tidak hilang saat pindah tab).</li>
+        <li><code>MiniPlayer</code>: Ditempatkan tepat di atas <code>NavigationBar</code>, sehingga selalu terlihat di tab mana pun selama ada lagu yang sedang dimuat.</li>
+      </ul>
+    </section>
+
+    <section id="player-controller">
+      <h2>13. UI: <code>player_controller.dart</code></h2>
+
+      <div class="card">
+        <h4>Struktur PlayerSnapshot:</h4>
+        <pre><code>class PlayerSnapshot {
+  final List&lt;PlayerTrack&gt; queue;   // Daftar lagu di antrean
+  final int index;                 // Indeks lagu yang aktif
+  final bool playing;              // Sedang berputar?
+  final bool buffering;            // Sedang memuat buffer?
+  final Duration position;         // Posisi detik saat ini
+  final Duration duration;         // Total durasi lagu
+  final bool shuffle;              // Status acak
+  final PlayerRepeatMode repeat;   // Off / All / One
+  final String? error;             // Pesan error jika gagal
+}
+</code></pre>
+        <p>Dengan <code>ListenableBuilder(listenable: player, ...)</code>, UI hanya akan merender ulang bagian yang diperlukan saat snapshot ini berubah.</p>
+      </div>
+    </section>
+
+    <section id="player-chrome">
+      <h2>14. UI: <code>player_chrome.dart</code> (Mini & Full Player)</h2>
+      <div class="card">
+        <h4>1. MiniPlayer (Kapsul Mengambang)</h4>
+        <p>Kapsul setinggi 60dp di atas bottom bar: menampilkan gambar album thumbnail kecil, judul lagu, nama artis/error, tombol Play/Pause, tombol Next, dan garis tipis progress bar di bagian bawah. Mengetuk kapsul akan memunculkan <em>Full Player</em>.</p>
+
+        <h4>2. FullPlayerView (Layar Penuh Modal)</h4>
+        <p>Layar penuh yang dibuka dari bawah (*modal bottom sheet*):</p>
+        <ul>
+          <li>Cover Art besar dengan rounded corner dan bayangan halus.</li>
+          <li>Slider durasi interaktif dengan format waktu <code>mm:ss</code> di kiri dan kanan. Pengguna bisa menggeser (seek) posisi lagu secara real-time.</li>
+          <li>Tombol transport lengkap: Shuffle, Previous, Play/Pause besar beraksen Crimson, Next, dan Repeat.</li>
+          <li>Drawer / Lembar antrean (*Queue Sheet*): Menampilkan daftar lagu berikutnya dengan opsi putar langsung dari indeks tertentu.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="screens">
+      <h2>15. UI Screens</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Screen</th>
+            <th>File</th>
+            <th>Perilaku & Tanggung Jawab</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Beranda</strong></td>
+            <td><code>screens/home.dart</code></td>
+            <td>Menampilkan rak horizontal (Quick picks, Playlist) dan baris vertikal. Tombol muat ulang selalu aktif mandiri. Rekomendasi harian artis favorit dilengkapi fallback mandiri via <code>ytService.search()</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Pencarian</strong></td>
+            <td><code>screens/search.dart</code></td>
+            <td>Kolom pencarian dengan tombol hapus, eksekusi debounced, dan filter chip (Semua, Lagu, Video, Album, Artis, Playlist). Respon lama yang datang terlambat otomatis diabaikan menggunakan <em>generation guard</em>.</td>
+          </tr>
+          <tr>
+            <td><strong>Browse</strong></td>
+            <td><code>screens/browse.dart</code></td>
+            <td>Halaman detail saat pengguna mengetuk album atau playlist dari Beranda/Search. Mendukung mode mandiri via <code>ytService.browse()</code> untuk memuat hingga 50 trek tanpa dependensi server proxy.</td>
+          </tr>
+          <tr>
+            <td><strong>Koleksi (Library)</strong></td>
+            <td><code>screens/library.dart</code></td>
+            <td>Pusat manajemen perpustakaan pengguna: pengelolaan playlist lokal kustom, album & artis tersimpan, lagu favorit offline, serta analitik statistik mendengarkan. Modal penambahan lagu didukung fallback pencarian mandiri.</td>
+          </tr>
+          <tr>
+            <td><strong>Pengaturan</strong></td>
+            <td><code>screens/settings.dart</code></td>
+            <td>Seksi Add-ons modular dengan toggle switch untuk server proxy. Menyimpan draf URL saat dinonaktifkan dan beralih ke mode mandiri. Dilengkapi panel manajemen cache audio (500 MB batas LRU).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- TIPS & GOTCHAS -->
+    <section id="gotchas">
+      <h2>16. Tips & Hal Penting untuk Junior Dev</h2>
+      <div class="callout danger">
+        <strong>⚠️ 1. Jangan pernah me-await <code>player.play()</code> di antrean serial!</strong>
+        <p>Ingat bahwa <code>AudioPlayer.play()</code> di Flutter baru selesai ketika pemutaran lagu berhenti. Jika Anda menulis <code>await player.play()</code> di dalam fungsi penggantian lagu, antrean berikutnya akan macet total sampai lagu tersebut selesai berputar!</p>
+      </div>
+
+      <div class="callout danger">
+        <strong>⚠️ 2. Masalah Build Windows (Drive C: vs Drive D:)</strong>
+        <p>Jika proyek berada di drive <code>D:</code> sedangkan folder cache pub berada di <code>C:\Users\...</code>, compiler Kotlin di Windows akan crash saat melakukan perbandingan path relatif untuk incremental cache. Solusinya: selalu sertakan <code>kotlin.incremental=false</code> di <code>android/gradle.properties</code>.</p>
+      </div>
+
+      <div class="callout info">
+        <strong>💡 3. Jangan Menaruh String Hex Sembarangan di Widget</strong>
+        <p>Gunakan selalu token warna dari <code>Theme.of(context).colorScheme</code> atau extension <code>context.sonora</code> di <code>lib/ui/theme.dart</code>. Ini memastikan aplikasi Anda secara otomatis mendukung tema Terang (*Light Mode*) dan Gelap (*Dark Mode*) tanpa perlu if-else warna manual.</p>
+      </div>
+    </section>
+
+    <footer style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+      Dokumentasi Kode Sonora-Flutter &bull; Dibuat untuk panduan tim pengembang Sonora Music.
+    </footer>
+  </main>
+</div>
+
+</body>
+</html>

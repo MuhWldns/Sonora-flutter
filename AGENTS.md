@@ -1,13 +1,13 @@
 # AGENTS.md — Sonora Flutter
 
-Flutter music-player client with standalone-first direct YouTube playback (BitChord-inspired) and optional self-hosted **Sonora Node proxy** ([Sonora-Music](https://github.com/MuhWldns/Sonora-Music)) support. Streams directly from GoogleVideo CDN without requiring an external proxy or server secrets.
+Flutter music-player client with standalone-first direct YouTube playback and optional self-hosted **Sonora Node proxy** ([Sonora-Music](https://github.com/MuhWldns/Sonora-Music)) modular add-on support. Streams directly from GoogleVideo CDN without requiring an external proxy or server secrets.
 
 ## Commands
 
 ```sh
 flutter pub get
 flutter analyze                          # must stay at 0 issues
-flutter test                             # 34 tests; no special flags needed
+flutter test                             # 35 tests; no special flags needed
 flutter run [--dart-define=SONORA_PROXY_URL=https://host]   # Android is the primary target
 flutter build apk --debug
 ```
@@ -65,4 +65,4 @@ lib/
 - `android/gradle.properties` sets `kotlin.incremental=false` and `kotlin.incremental.jvm=false` — **do not remove**. Kotlin incremental compilation crashes with relative-path errors when project and Gradle cache sit on different Windows drives.
 - `AndroidManifest.xml` has `android:usesCleartextTraffic="true"` (plain-http self-hosted proxies must keep working). Permissions: INTERNET, WAKE_LOCK, FOREGROUND_SERVICE(_MEDIA_PLAYBACK). `MainActivity` extends `AudioServiceActivity`.
 - `applicationId` is still the template default `com.example.sonora_flutter` (known TODO); release APK currently signs with debug keys.
-- Target Android API 21–36+; `docs/` is gitignored (local-only documentation).
+- Target Android API 21–36+; `docs/code_documentation.html` provides developer reference guides.
