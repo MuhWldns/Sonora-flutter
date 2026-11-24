@@ -18,7 +18,7 @@ flutter test
 | :--- | :--- | :---: |
 | `test/data_test.dart` | Kontrak boundary lapisan data: serialisasi model, normalisasi `SettingsStore` (audio quality, equalizer, theme mode, cache limit), ketahanan `SonoraApi`, manipulasi direktori cache disk. | 34 |
 | `test/database_test.dart` | Integritas basis data SQLite nyata (`databaseFactoryFfi`): *playback history limit 100*, relasi playlist, favorit, filter *skip 15 detik*. | 5 |
-| `test/youtube_auth_test.dart` | Sesi & login YouTube Music: `sapisidHash`, `sapisidFromCookie`, `YoutubeAuthService.capture/restore/signOut`, header sesi innertube (SAPISIDHASH, `onBehalfOfUser` tanpa sufiks `||`), `validateSession` berbasis status, `fetchAccountInfo` (nama/email/avatar), `fetchHomeSections`, dan pencarian sesi masuk. | 37 |
+| `test/youtube_auth_test.dart` | Sesi & login YouTube Music: `sapisidHash`, `sapisidFromCookie`, `YoutubeAuthService.capture/restore/signOut`, header sesi innertube (SAPISIDHASH, `onBehalfOfUser` tanpa sufiks `\|\|`), `validateSession` berbasis status, `fetchAccountInfo` (nama/email/avatar), `fetchHomeSections`, dan pencarian sesi masuk. | 37 |
 | `test/blackbox_ui_test.dart` | Uji kotak hitam UI (`WidgetTester`) 6 modul fungsional. **Tidak dihitung sebagai suite hermetis** — lihat §2. | 23 |
 | **Total hermetis** | `data` + `database` + `youtube_auth` | **76** |
 
