@@ -10,6 +10,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -46,6 +47,9 @@ class FakeSonoraAudioHandler extends BaseAudioHandler
 
   @override
   Duration get position => Duration.zero;
+
+  @override
+  AndroidEqualizer? get equalizer => null;
 
   @override
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0}) async {

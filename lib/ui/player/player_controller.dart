@@ -14,6 +14,7 @@ library;
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../data/local_database.dart';
@@ -132,6 +133,9 @@ class PlayerController extends ChangeNotifier {
 
   PlayerSnapshot _snapshot = const PlayerSnapshot();
   PlayerSnapshot get snapshot => _snapshot;
+
+  /// Equalizer Android bila didukung perangkat; `null` di platform lain.
+  AndroidEqualizer? get equalizer => _handler.equalizer;
 
   List<MediaItem> _nativeQueue = const <MediaItem>[];
   MediaItem? _current;

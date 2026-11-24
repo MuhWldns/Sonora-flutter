@@ -48,10 +48,13 @@ class YouTubeMusicService {
   static const String _innertubeKey = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
   static const int _maxSearchResults = 30;
 
-  /// Mengambil direct stream URI dengan bitrate audio tertinggi.
+  /// Mengambil direct stream URI sesuai preferensi [quality].
   ///
   /// Mengembalikan `null` jika resolusi gagal agar pemanggil dapat melakukan fallback.
-  Future<Uri?> resolveStreamUri(String videoId) async {
+  Future<Uri?> resolveStreamUri(
+    String videoId, {
+    AudioQuality quality = AudioQuality.auto,
+  }) async {
     if (_disposed || videoId.isEmpty) return null;
 
     final _CachedStream? cached = _streamCache[videoId];
@@ -67,34 +70,7 @@ class YouTubeMusicService {
       final StreamManifest manifest =
           await _yt.videos.streamsClient.getManifest(videoId);
 
-      // Hierarki prioritas format:
-      // 1. AAC/M4A (itag 140 / mp4) untuk kompatibilitas durasi dan seeking presisi di Android Media3.
-      // 2. audioOnly bitrate tertinggi (misal Opus/WebM itag 251, ~160 kbps).
-      // 3. Fallback terakhir ke muxed MP4 (paling stabil dapat diakses).
-      final List<AudioStreamInfo> aacStreams = manifest.audioOnly
-          .where(
-            (AudioStreamInfo s) =>
-                s.container.name.toLowerCase() == 'mp4' ||
-                s.audioCodec.toLowerCase().contains('mp4a') ||
-                s.tag == 140,
-          )
-          .toList()
-        ..sort(
-            (AudioStreamInfo a, AudioStreamInfo b) => b.bitrate.compareTo(a.bitrate));
-      final List<AudioStreamInfo> otherAudioStreams = manifest.audioOnly
-          .where((AudioStreamInfo s) => !aacStreams.contains(s))
-          .toList()
-        ..sort(
-            (AudioStreamInfo a, AudioStreamInfo b) => b.bitrate.compareTo(a.bitrate));
-      final List<MuxedStreamInfo> muxedStreams = manifest.muxed.toList()
-        ..sort((MuxedStreamInfo a, MuxedStreamInfo b) =>
-            b.bitrate.compareTo(a.bitrate));
-
-      final List<StreamInfo> candidates = <StreamInfo>[
-        ...aacStreams,
-        ...otherAudioStreams,
-        ...muxedStreams,
-      ];
+      final List<StreamInfo> candidates = _orderCandidates(manifest, quality);
 
       for (final StreamInfo stream in candidates) {
         if (!await _streamUsable(stream.url)) continue;
@@ -110,6 +86,55 @@ class YouTubeMusicService {
     } catch (e) {
       debugPrint('[YouTubeMusicService] Resolusi stream $videoId gagal: $e');
       return null;
+    }
+  }
+
+  /// Mengurutkan kandidat stream sesuai preferensi kualitas [quality].
+  ///
+  /// Semua kandidat tetap melewati uji akses (`_streamUsable`) di pemanggil;
+  /// urutan hanya menentukan format mana yang dicoba lebih dulu.
+  static List<StreamInfo> _orderCandidates(
+    StreamManifest manifest,
+    AudioQuality quality,
+  ) {
+    final List<AudioStreamInfo> audioOnly = manifest.audioOnly.toList();
+    final List<MuxedStreamInfo> muxed = manifest.muxed.toList();
+    switch (quality) {
+      case AudioQuality.best:
+        // Bitrate tertinggi dulu tanpa memandang codec, lalu muxed.
+        audioOnly.sort(
+            (AudioStreamInfo a, AudioStreamInfo b) => b.bitrate.compareTo(a.bitrate));
+        muxed.sort((MuxedStreamInfo a, MuxedStreamInfo b) =>
+            b.bitrate.compareTo(a.bitrate));
+        return <StreamInfo>[...audioOnly, ...muxed];
+      case AudioQuality.hemat:
+        // Bitrate terendah dulu untuk menghemat kuota data.
+        audioOnly.sort(
+            (AudioStreamInfo a, AudioStreamInfo b) => a.bitrate.compareTo(b.bitrate));
+        muxed.sort((MuxedStreamInfo a, MuxedStreamInfo b) =>
+            a.bitrate.compareTo(b.bitrate));
+        return <StreamInfo>[...audioOnly, ...muxed];
+      case AudioQuality.auto:
+        // AAC/M4A (itag 140 / mp4) untuk presisi seeking Media3, lalu
+        // audio-only lain (Opus/WebM), terakhir muxed MP4.
+        final List<AudioStreamInfo> aac = audioOnly
+            .where(
+              (AudioStreamInfo s) =>
+                  s.container.name.toLowerCase() == 'mp4' ||
+                  s.audioCodec.toLowerCase().contains('mp4a') ||
+                  s.tag == 140,
+            )
+            .toList()
+          ..sort((AudioStreamInfo a, AudioStreamInfo b) =>
+              b.bitrate.compareTo(a.bitrate));
+        final List<AudioStreamInfo> other = audioOnly
+            .where((AudioStreamInfo s) => !aac.contains(s))
+            .toList()
+          ..sort((AudioStreamInfo a, AudioStreamInfo b) =>
+              b.bitrate.compareTo(a.bitrate));
+        muxed.sort((MuxedStreamInfo a, MuxedStreamInfo b) =>
+            b.bitrate.compareTo(a.bitrate));
+        return <StreamInfo>[...aac, ...other, ...muxed];
     }
   }
 

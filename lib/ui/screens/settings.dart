@@ -2,9 +2,13 @@
 /// Menyimpan endpoint yang valid menghentikan audio lama dan menyegarkan feed.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../data/audio_cache_service.dart';
+import '../../data/music_models.dart';
 import '../../data/settings_store.dart';
 import '../../data/sonora_api.dart';
 import '../app_scope.dart';
@@ -12,6 +16,18 @@ import '../theme.dart';
 import '../widgets/common.dart';
 
 enum _TestState { idle, testing, ok, fail }
+
+/// Preset equalizer siap pakai (nilai dB per band, rendah ke tinggi).
+enum _EqPreset {
+  flat('Flat', <double>[0, 0, 0, 0, 0]),
+  bass('Bass Boost', <double>[6, 4, 2, 0, 0]),
+  vocal('Vokal', <double>[-2, 0, 3, 3, 0]),
+  treble('Treble', <double>[0, 0, 2, 4, 6]);
+
+  const _EqPreset(this.label, this.gains);
+  final String label;
+  final List<double> gains;
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -30,6 +46,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _testMessage;
   int _cacheBytes = 0;
   bool _clearingCache = false;
+  AndroidEqualizerParameters? _eqParams;
+  List<double> _eqGains = const <double>[0, 0, 0, 0, 0];
+  bool _clearingHistory = false;
 
   @override
   void initState() {
@@ -63,6 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _controller.text =
           settings.isConfigured ? settings.proxyBase : settings.proxyDraft;
     }
+    _loadEqualizerIfNeeded();
   }
 
   @override
@@ -186,6 +206,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final ColorScheme scheme = context.scheme;
     final SonoraScope scope = SonoraScope.of(context);
+    final int limitMb = scope.settings.cacheLimitMb;
+    final String limitLabel = limitMb >= 1024 ? '1 GB' : '$limitMb MB';
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -345,90 +367,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: kSpaceXl),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(kSpaceLg),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(kRadiusLg),
-                      border: Border.all(color: scheme.outlineVariant),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          children: <Widget>[
-                            Icon(Icons.cached_rounded, size: 22, color: scheme.primary),
-                            const SizedBox(width: kSpaceSm),
-                            Text('Penyimpanan & Cache Audio', style: context.texts.titleMedium),
-                          ],
-                        ),
-                        const SizedBox(height: kSpaceXs),
-                        Text(
-                          'Berkas stream audio yang telah di-cache ke memori perangkat agar dapat diputar mulus tanpa jeda buffer.',
-                          style: context.texts.bodyMedium
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: kSpaceLg),
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    'Penggunaan Cache (Batas: 500 MB)',
-                                    style: context.texts.labelSmall
-                                        ?.copyWith(color: scheme.onSurfaceVariant),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${AudioCacheService.formatBytes(_cacheBytes)} / 500 MB',
-                                    style: context.texts.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: scheme.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                  _audioSection(context, scope),
+                  const SizedBox(height: kSpaceXl),
+                  _themeSection(context, scope),
+                  const SizedBox(height: kSpaceXl),
+                  _settingsCard(
+                    context,
+                    icon: Icons.cached_rounded,
+                    title: 'Penyimpanan & Cache Audio',
+                    subtitle:
+                        'Berkas stream audio yang telah di-cache ke memori perangkat agar dapat diputar mulus tanpa jeda buffer.',
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              'Batas penyimpanan otomatis',
+                              style: context.texts.labelSmall
+                                  ?.copyWith(color: scheme.onSurfaceVariant),
                             ),
-                            OutlinedButton.icon(
-                              onPressed: _clearingCache ? null : _clearCache,
-                              icon: _clearingCache
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.delete_outline_rounded, size: 20),
-                              label: const Text('Bersihkan'),
+                          ),
+                          DropdownButton<int>(
+                            value: scope.settings.cacheLimitMb,
+                            items: const <DropdownMenuItem<int>>[
+                              DropdownMenuItem<int>(value: 250, child: Text('250 MB')),
+                              DropdownMenuItem<int>(value: 500, child: Text('500 MB')),
+                              DropdownMenuItem<int>(value: 1024, child: Text('1 GB')),
+                              DropdownMenuItem<int>(value: 0, child: Text('Tanpa batas')),
+                            ],
+                            onChanged: (int? value) {
+                              if (value == null) return;
+                              _applySetting(
+                                  () => scope.settings.setCacheLimitMb(value));
+                              if (value > 0) {
+                                unawaited(AudioCacheService.pruneCache(
+                                    maxBytes: value * 1024 * 1024));
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: kSpaceMd),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  limitMb > 0
+                                      ? 'Penggunaan Cache (Batas: $limitLabel)'
+                                      : 'Penggunaan Cache',
+                                  style: context.texts.labelSmall
+                                      ?.copyWith(color: scheme.onSurfaceVariant),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  limitMb > 0
+                                      ? '${AudioCacheService.formatBytes(_cacheBytes)} / $limitLabel'
+                                      : AudioCacheService.formatBytes(_cacheBytes),
+                                  style: context.texts.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _clearingCache ? null : _clearCache,
+                            icon: _clearingCache
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.delete_outline_rounded, size: 20),
+                            label: const Text('Bersihkan'),
+                          ),
+                        ],
+                      ),
+                      if (limitMb > 0) ...<Widget>[
                         const SizedBox(height: kSpaceMd),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(kRadiusSm),
                           child: LinearProgressIndicator(
-                            value: (_cacheBytes / AudioCacheService.defaultMaxCacheSizeBytes)
+                            value: (_cacheBytes / (limitMb * 1024 * 1024))
                                 .clamp(0.0, 1.0),
                             minHeight: 6,
                             backgroundColor: scheme.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              (_cacheBytes / AudioCacheService.defaultMaxCacheSizeBytes) > 0.9
+                              (_cacheBytes / (limitMb * 1024 * 1024)) > 0.9
                                   ? scheme.error
                                   : scheme.primary,
                             ),
                           ),
                         ),
-                        const SizedBox(height: kSpaceXs),
-                        Text(
-                          'Pembersihan otomatis LRU: memangkas ke 400 MB saat mencapai batas 500 MB.',
-                          style: context.texts.labelSmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
                       ],
-                    ),
+                      const SizedBox(height: kSpaceXs),
+                      Text(
+                        limitMb > 0
+                            ? 'Pembersihan otomatis LRU memangkas cache saat mendekati batas.'
+                            : 'Tanpa batas: pembersihan otomatis LRU dinonaktifkan.',
+                        style: context.texts.labelSmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: kSpaceXl),
+                  _historyCard(context, scope),
                   const SizedBox(height: kSpaceXl),
                   Text('Status', style: context.texts.titleMedium),
                   const SizedBox(height: kSpaceSm),
@@ -454,6 +501,344 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       backgroundColor: scheme.surface,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Seksi pengaturan: audio, tampilan, riwayat
+  // ---------------------------------------------------------------------------
+
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: kSpaceSm),
+      child: Text(text, style: context.texts.titleMedium),
+    );
+  }
+
+  Widget _settingsCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
+    final ColorScheme scheme = context.scheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(kSpaceLg),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(kRadiusLg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(icon, size: 22, color: scheme.primary),
+              const SizedBox(width: kSpaceSm),
+              Text(title, style: context.texts.titleMedium),
+            ],
+          ),
+          const SizedBox(height: kSpaceXs),
+          Text(
+            subtitle,
+            style: context.texts.bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: kSpaceMd),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Future<void> _applySetting(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) showSonoraSnack(context, 'Gagal menyimpan pengaturan: $error');
+    }
+  }
+
+  void _loadEqualizerIfNeeded() {
+    if (_eqParams != null) return;
+    final AndroidEqualizer? equalizer = SonoraScope.of(context).player.equalizer;
+    if (equalizer == null) return;
+    equalizer.parameters.then((AndroidEqualizerParameters parameters) {
+      if (!mounted) return;
+      setState(() {
+        _eqParams = parameters;
+        final List<int> stored = SonoraScope.of(context).settings.equalizerBands;
+        _eqGains = List<double>.generate(
+          parameters.bands.length,
+          (int i) => i < stored.length ? stored[i].toDouble() : 0,
+        );
+      });
+    });
+  }
+
+  Widget _audioSection(BuildContext context, SonoraScope scope) {
+    final SettingsStore settings = scope.settings;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _sectionLabel('Audio'),
+        _settingsCard(
+          context,
+          icon: Icons.graphic_eq_rounded,
+          title: 'Kualitas Audio',
+          subtitle:
+              'Terbaik memilih bitrate tertinggi, Otomatis memprioritaskan '
+              'AAC/M4A agar seeking presisi, Hemat memilih bitrate terendah.',
+          children: <Widget>[
+            SegmentedButton<AudioQuality>(
+              segments: const <ButtonSegment<AudioQuality>>[
+                ButtonSegment<AudioQuality>(
+                    value: AudioQuality.best, label: Text('Terbaik')),
+                ButtonSegment<AudioQuality>(
+                    value: AudioQuality.auto, label: Text('Otomatis')),
+                ButtonSegment<AudioQuality>(
+                    value: AudioQuality.hemat, label: Text('Hemat')),
+              ],
+              selected: <AudioQuality>{settings.audioQuality},
+              onSelectionChanged: (Set<AudioQuality> selected) {
+                _applySetting(() => settings.setAudioQuality(selected.first));
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: kSpaceMd),
+        _equalizerCard(context, scope),
+      ],
+    );
+  }
+
+  Widget _equalizerCard(BuildContext context, SonoraScope scope) {
+    final SettingsStore settings = scope.settings;
+    final AndroidEqualizer? equalizer = scope.player.equalizer;
+    final ColorScheme scheme = context.scheme;
+    return _settingsCard(
+      context,
+      icon: Icons.equalizer_rounded,
+      title: 'Equalizer',
+      subtitle: equalizer == null
+          ? 'Equalizer hanya tersedia di perangkat Android.'
+          : 'Setel gain tiap band (dB) atau pakai preset cepat.',
+      children: <Widget>[
+        if (equalizer != null) ...<Widget>[
+          Container(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(kRadiusMd),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: SwitchListTile.adaptive(
+                value: settings.equalizerEnabled,
+                onChanged: (bool value) {
+                  unawaited(equalizer.setEnabled(value));
+                  _applySetting(() => settings.setEqualizerEnabled(value));
+                },
+                activeTrackColor: scheme.primary,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: kSpaceMd,
+                  vertical: kSpaceXs,
+                ),
+                title: Text('Aktifkan equalizer', style: context.texts.titleSmall),
+              ),
+            ),
+          ),
+          const SizedBox(height: kSpaceMd),
+          Wrap(
+            spacing: kSpaceXs,
+            runSpacing: kSpaceXs,
+            children: <Widget>[
+              for (final _EqPreset preset in _EqPreset.values)
+                ActionChip(
+                  label: Text(preset.label),
+                  onPressed: () =>
+                      _applyEqualizerPreset(equalizer, settings, preset),
+                ),
+            ],
+          ),
+          const SizedBox(height: kSpaceMd),
+          if (_eqParams == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: kSpaceSm),
+              child: LinearProgressIndicator(minHeight: 2),
+            )
+          else
+            for (var i = 0; i < _eqGains.length; i++)
+              _equalizerBandSlider(equalizer, settings, i),
+        ],
+      ],
+    );
+  }
+
+  Widget _equalizerBandSlider(
+    AndroidEqualizer equalizer,
+    SettingsStore settings,
+    int index,
+  ) {
+    final ColorScheme scheme = context.scheme;
+    final AndroidEqualizerParameters parameters = _eqParams!;
+    final AndroidEqualizerBand band = parameters.bands[index];
+    final double min = parameters.minDecibels.clamp(-15.0, 0.0).toDouble();
+    final double max = parameters.maxDecibels.clamp(0.0, 15.0).toDouble();
+    return Row(
+      children: <Widget>[
+        SizedBox(
+          width: 64,
+          child: Text(
+            _formatHz(band.centerFrequency),
+            style: context.texts.labelSmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            value: _eqGains[index].clamp(min, max),
+            min: min,
+            max: max,
+            divisions: ((max - min) * 2).round(),
+            label: '${_eqGains[index].toStringAsFixed(1)} dB',
+            onChanged: (double value) {
+              setState(() => _eqGains[index] = value);
+              band.setGain(value);
+            },
+            onChangeEnd: (double value) {
+              final List<int> gains =
+                  _eqGains.map((double v) => v.round()).toList();
+              _applySetting(() => settings.setEqualizerBands(gains));
+            },
+          ),
+        ),
+        SizedBox(
+          width: 56,
+          child: Text(
+            '${_eqGains[index].toStringAsFixed(1)} dB',
+            textAlign: TextAlign.end,
+            style: context.texts.labelSmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _applyEqualizerPreset(
+    AndroidEqualizer equalizer,
+    SettingsStore settings,
+    _EqPreset preset,
+  ) {
+    final List<double> gains = preset.gains;
+    setState(() => _eqGains = List<double>.from(gains));
+    final List<AndroidEqualizerBand> bands =
+        _eqParams?.bands ?? const <AndroidEqualizerBand>[];
+    for (var i = 0; i < bands.length && i < gains.length; i++) {
+      bands[i].setGain(gains[i]);
+    }
+    _applySetting(
+      () => settings.setEqualizerBands(gains.map((double v) => v.round()).toList()),
+    );
+  }
+
+  String _formatHz(double hz) {
+    if (hz >= 1000) return '${(hz / 1000).toStringAsFixed(1)} kHz';
+    return '${hz.round()} Hz';
+  }
+
+  Widget _themeSection(BuildContext context, SonoraScope scope) {
+    final SettingsStore settings = scope.settings;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _sectionLabel('Tampilan'),
+        _settingsCard(
+          context,
+          icon: Icons.dark_mode_rounded,
+          title: 'Mode Tema',
+          subtitle: 'Ikuti tema sistem, atau paksa gelap/terang secara manual.',
+          children: <Widget>[
+            SegmentedButton<AppThemeMode>(
+              segments: const <ButtonSegment<AppThemeMode>>[
+                ButtonSegment<AppThemeMode>(
+                    value: AppThemeMode.sistem, label: Text('Sistem')),
+                ButtonSegment<AppThemeMode>(
+                    value: AppThemeMode.gelap, label: Text('Gelap')),
+                ButtonSegment<AppThemeMode>(
+                    value: AppThemeMode.terang, label: Text('Terang')),
+              ],
+              selected: <AppThemeMode>{settings.themeMode},
+              onSelectionChanged: (Set<AppThemeMode> selected) {
+                _applySetting(() => settings.setThemeMode(selected.first));
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _historyCard(BuildContext context, SonoraScope scope) {
+    return _settingsCard(
+      context,
+      icon: Icons.history_rounded,
+      title: 'Riwayat',
+      subtitle:
+          'Bersihkan riwayat pencarian dan riwayat putar yang tersimpan di perangkat.',
+      children: <Widget>[
+        OutlinedButton.icon(
+          onPressed:
+              _clearingHistory ? null : () => _confirmClearHistory(scope),
+          icon: _clearingHistory
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_sweep_rounded, size: 20),
+          label: const Text('Bersihkan riwayat'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmClearHistory(SonoraScope scope) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Bersihkan riwayat?'),
+        content: const Text(
+          'Seluruh riwayat pencarian dan riwayat putar akan dihapus dari '
+          'perangkat. Tindakan ini tidak dapat dibatalkan.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _clearingHistory = true);
+    try {
+      await scope.database?.clearSearchHistory();
+      await scope.database?.clearPlaybackHistory();
+      if (!mounted) return;
+      showSonoraSnack(context, 'Riwayat berhasil dibersihkan.', success: true);
+    } catch (_) {
+      if (!mounted) return;
+      showSonoraSnack(context, 'Gagal membersihkan riwayat.');
+    } finally {
+      if (mounted) setState(() => _clearingHistory = false);
+    }
   }
 
   Widget _testStatus(SonoraScope scope) {

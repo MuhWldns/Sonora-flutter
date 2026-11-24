@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -7,6 +8,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../data/audio_cache_service.dart';
 import '../data/music_models.dart';
+import '../data/settings_store.dart';
 import '../data/sonora_api.dart';
 import '../data/youtube_music_service.dart';
 
@@ -32,6 +34,9 @@ abstract interface class SonoraPlaybackHandler implements AudioHandler {
   ValueListenable<String?> get error;
   Stream<Duration> get positionStream;
   Duration get position;
+  /// Android equalizer exposed for the settings UI, or `null` when the
+  /// platform does not support it.
+  AndroidEqualizer? get equalizer;
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0});
 }
 
@@ -41,17 +46,24 @@ class SonoraAudioHandler extends BaseAudioHandler
   SonoraAudioHandler({
     SonoraApi? api,
     YouTubeMusicService? ytService,
-  })  : _yt = ytService ?? YouTubeMusicService(),
-        _player = AudioPlayer() {
+    this.settings,
+  }) : _yt = ytService ?? YouTubeMusicService() {
+    final (AudioPlayer player, AndroidEqualizer? equalizer) =
+        _createPlayerWithEffects();
+    _player = player;
+    _equalizer = equalizer;
     _sub = _player.sequenceStateStream.listen(_onSequenceChanged);
     _stateSub = _player.playbackEventStream.listen(_onPlaybackEvent);
     _durationSub = _player.durationStream.listen(_onDuration);
     _positionSub = _player.positionStream.listen(_onPosition);
     _errorSub = _player.errorStream.listen(_onPlayerError);
+    _applyStoredEqualizer();
   }
 
   final YouTubeMusicService _yt;
-  final AudioPlayer _player;
+  final SettingsStore? settings;
+  late final AudioPlayer _player;
+  late final AndroidEqualizer? _equalizer;
 
   StreamSubscription<SequenceState>? _sub;
   StreamSubscription<PlaybackEvent>? _stateSub;
@@ -96,6 +108,32 @@ class SonoraAudioHandler extends BaseAudioHandler
   @override
   Stream<Duration> get positionStream => _positionController.stream;
 
+  @override
+  AndroidEqualizer? get equalizer => _equalizer;
+
+  /// Builds the [AudioPlayer] together with its Android audio effects.
+  ///
+  /// The equalizer must be part of the [AudioPipeline] passed to the
+  /// [AudioPlayer] constructor, so both are created as a pair here. The
+  /// equalizer is only created on real Android devices; elsewhere it stays
+  /// `null` and playback works without effects.
+  static (AudioPlayer, AndroidEqualizer?) _createPlayerWithEffects() {
+    AndroidEqualizer? equalizer;
+    if (!kIsWeb) {
+      try {
+        if (Platform.isAndroid) equalizer = AndroidEqualizer();
+      } catch (_) {
+        equalizer = null;
+      }
+    }
+    final AudioPlayer player = AudioPlayer(
+      audioPipeline: equalizer == null
+          ? null
+          : AudioPipeline(androidAudioEffects: <AndroidEqualizer>[equalizer]),
+    );
+    return (player, equalizer);
+  }
+
   /// Configures the audio session and starts the background service.
   ///
   /// Safe to call on Android and web. Android is the primary target; the web
@@ -103,11 +141,13 @@ class SonoraAudioHandler extends BaseAudioHandler
   static Future<SonoraAudioHandler> initialize(
     SonoraApi api, {
     YouTubeMusicService? ytService,
+    SettingsStore? settings,
   }) async {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
     final handler = await AudioService.init<SonoraAudioHandler>(
-      builder: () => SonoraAudioHandler(api: api, ytService: ytService),
+      builder: () =>
+          SonoraAudioHandler(api: api, ytService: ytService, settings: settings),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.sonora_flutter.playback',
         androidNotificationChannelName: 'Sonora playback',
@@ -142,6 +182,28 @@ class SonoraAudioHandler extends BaseAudioHandler
     _noisySub = session.becomingNoisyEventStream.listen((_) {
       _runGuarded(pause);
     });
+  }
+
+  /// Applies the equalizer preferences stored in [SettingsStore] once.
+  ///
+  /// Safe to call before any playback: just_audio keeps the requested band
+  /// gains and pushes them to the platform when the pipeline activates.
+  void _applyStoredEqualizer() {
+    final AndroidEqualizer? equalizer = _equalizer;
+    final SettingsStore? store = settings;
+    if (equalizer == null || store == null) return;
+    unawaited(
+      equalizer.parameters
+          .then((AndroidEqualizerParameters parameters) async {
+        await equalizer.setEnabled(store.equalizerEnabled);
+        final List<int> gains = store.equalizerBands;
+        for (var i = 0; i < parameters.bands.length && i < gains.length; i++) {
+          await parameters.bands[i].setGain(gains[i].toDouble());
+        }
+      }).catchError((Object _) {
+        // The equalizer is optional; platform failures are ignored.
+      }),
+    );
   }
 
   /// Replaces the queue with [items] and starts playback at [startIndex].
@@ -202,7 +264,10 @@ class SonoraAudioHandler extends BaseAudioHandler
       final videoId = item.videoId!;
       Uri? uri;
       try {
-        uri = await _yt.resolveStreamUri(videoId);
+        uri = await _yt.resolveStreamUri(
+          videoId,
+          quality: settings?.audioQuality ?? AudioQuality.auto,
+        );
       } catch (_) {}
       if (uri == null) {
         throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
@@ -239,7 +304,11 @@ class SonoraAudioHandler extends BaseAudioHandler
     // Broadcast so the notification and UI agree with the native playlist.
     _publishQueue();
     _publishMediaItem();
-    unawaited(AudioCacheService.pruneCache());
+    final int limitMb = settings?.cacheLimitMb ?? 500;
+    if (limitMb > 0) {
+      // A limit of 0 means "unlimited": skip automatic pruning.
+      unawaited(AudioCacheService.pruneCache(maxBytes: limitMb * 1024 * 1024));
+    }
     return true;
   }
 

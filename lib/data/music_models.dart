@@ -111,6 +111,18 @@ class MusicSection {
   }
 }
 
+/// Preferensi kualitas audio untuk pemilihan format stream.
+enum AudioQuality {
+  /// Bitrate tertinggi yang tersedia, tanpa memandang jenis codec.
+  best,
+
+  /// Seimbang: prioritaskan AAC/M4A (kompatibilitas Media3), lalu Opus.
+  auto,
+
+  /// Hemat kuota: bitrate terendah yang tetap layak didengar lebih dulu.
+  hemat,
+}
+
 /// Menggabungkan nama-nama artis (`artists[].name`) menjadi satu string.
 String _artistFrom(Object? value) {
   final names = <String>[];

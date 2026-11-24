@@ -47,7 +47,11 @@ class _StartupState extends State<_Startup> {
       settings = await SettingsStore.load();
       api = SonoraApi(settings);
       ytService = YouTubeMusicService();
-      final audio = await SonoraAudioHandler.initialize(api, ytService: ytService);
+      final audio = await SonoraAudioHandler.initialize(
+        api,
+        ytService: ytService,
+        settings: settings,
+      );
       // Basis data lokal opsional: riwayat pencarian + favorit. Kegagalan
       // membuka SQLite tidak boleh menggagalkan aplikasi.
       try {
@@ -55,8 +59,12 @@ class _StartupState extends State<_Startup> {
       } catch (_) {
         database = null;
       }
-      // Pemangkasan cache audio di latar belakang (LRU max 500 MB) pada startup.
-      unawaited(AudioCacheService.pruneCache());
+      // Pemangkasan cache audio di latar belakang (LRU) pada startup,
+      // mengikuti batas yang dipilih pengguna (0 = tanpa batas).
+      final int limitMb = settings.cacheLimitMb;
+      if (limitMb > 0) {
+        unawaited(AudioCacheService.pruneCache(maxBytes: limitMb * 1024 * 1024));
+      }
       if (!mounted) {
         await database?.close();
         await audio.dispose();

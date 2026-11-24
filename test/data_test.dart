@@ -346,6 +346,89 @@ void main() {
       // Pulihkan platform in-memory untuk tes berikutnya.
       SharedPreferences.setMockInitialValues(<String, Object>{});
     });
+
+    test('kualitas audio: default auto, roundtrip, fallback korup', () async {
+      final store = await _store(null);
+      expect(store.audioQuality, AudioQuality.auto);
+
+      await store.setAudioQuality(AudioQuality.hemat);
+      expect(store.audioQuality, AudioQuality.hemat);
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.audioQuality, AudioQuality.hemat);
+
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'sonora.audioQuality': 'paling-ngebut',
+      });
+      final corrupt = await SettingsStore.load();
+      expect(corrupt.audioQuality, AudioQuality.auto);
+      store.dispose();
+      reloaded.dispose();
+      corrupt.dispose();
+    });
+
+    test('mode tema: default sistem, roundtrip, fallback korup', () async {
+      final store = await _store(null);
+      expect(store.themeMode, AppThemeMode.sistem);
+
+      await store.setThemeMode(AppThemeMode.gelap);
+      expect(store.themeMode, AppThemeMode.gelap);
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.themeMode, AppThemeMode.gelap);
+
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'sonora.themeMode': 7,
+      });
+      final corrupt = await SettingsStore.load();
+      expect(corrupt.themeMode, AppThemeMode.sistem);
+      store.dispose();
+      reloaded.dispose();
+      corrupt.dispose();
+    });
+
+    test('batas cache: default 500 MB, roundtrip, 0 tanpa batas, korup', () async {
+      final store = await _store(null);
+      expect(store.cacheLimitMb, 500);
+
+      await store.setCacheLimitMb(250);
+      expect(store.cacheLimitMb, 250);
+      await store.setCacheLimitMb(0);
+      expect(store.cacheLimitMb, 0);
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.cacheLimitMb, 0);
+
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'sonora.cacheLimitMb': 99999,
+      });
+      final corrupt = await SettingsStore.load();
+      expect(corrupt.cacheLimitMb, 500);
+      store.dispose();
+      reloaded.dispose();
+      corrupt.dispose();
+    });
+
+    test('equalizer: default nonaktif, band di-clamp, roundtrip, korup', () async {
+      final store = await _store(null);
+      expect(store.equalizerEnabled, isFalse);
+      expect(store.equalizerBands, const <int>[0, 0, 0, 0, 0]);
+
+      await store.setEqualizerEnabled(true);
+      await store.setEqualizerBands(<int>[-20, -4, 0, 4, 20]);
+      expect(store.equalizerEnabled, isTrue);
+      expect(store.equalizerBands, const <int>[-15, -4, 0, 4, 15]);
+
+      final reloaded = await SettingsStore.load();
+      expect(reloaded.equalizerEnabled, isTrue);
+      expect(reloaded.equalizerBands, const <int>[-15, -4, 0, 4, 15]);
+
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'sonora.equalizerBands': '1,2,3',
+      });
+      final corrupt = await SettingsStore.load();
+      expect(corrupt.equalizerBands, const <int>[0, 0, 0, 0, 0]);
+      store.dispose();
+      reloaded.dispose();
+      corrupt.dispose();
+    });
   });
 
   group('SonoraApi', () {

@@ -59,14 +59,24 @@ class _SonoraAppState extends State<SonoraApp> {
       player: _player,
       tabs: _tabs,
       database: widget.database,
-      child: MaterialApp(
-        title: 'Sonora',
-        debugShowCheckedModeBanner: false,
-        theme: buildSonoraTheme(Brightness.light),
-        darkTheme: buildSonoraTheme(Brightness.dark),
-        themeMode: ThemeMode.system,
-        home: const RootShell(),
+      child: ListenableBuilder(
+        listenable: widget.settings,
+        builder: (BuildContext context, Widget? _) => MaterialApp(
+          title: 'Sonora',
+          debugShowCheckedModeBanner: false,
+          theme: buildSonoraTheme(Brightness.light),
+          darkTheme: buildSonoraTheme(Brightness.dark),
+          themeMode: _mapThemeMode(widget.settings.themeMode),
+          home: const RootShell(),
+        ),
       ),
     );
   }
+
+  /// Memetakan pilihan tema pengguna ke [ThemeMode] Material.
+  static ThemeMode _mapThemeMode(AppThemeMode mode) => switch (mode) {
+        AppThemeMode.sistem => ThemeMode.system,
+        AppThemeMode.gelap => ThemeMode.dark,
+        AppThemeMode.terang => ThemeMode.light,
+      };
 }
