@@ -165,6 +165,229 @@ const String _accountMenuSparseJson = '''
 }
 ''';
 
+/// Respons browse FEmusic_home: rak carousel berjudul, rak tanpa judul
+/// (kartu riwayat MPED), rak biasa (baris responsif), dan rak kosong.
+const String _homeJson = '''
+{
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "musicCarouselShelfRenderer": {
+                      "header": {
+                        "musicCarouselShelfBasicHeaderRenderer": {
+                          "title": {"runs": [{"text": "Quick picks"}]}
+                        }
+                      },
+                      "contents": [
+                        {
+                          "musicTwoRowItemRenderer": {
+                            "navigationEndpoint": {
+                              "watchEndpoint": {"videoId": "homeVid"}
+                            },
+                            "title": {"runs": [{"text": "Lagu Utama"}]},
+                            "subtitle": {"runs": [{"text": "Artis Utama"}]},
+                            "thumbnailRenderer": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": {
+                                  "thumbnails": [
+                                    {
+                                      "url": "https://i.ytimg.com/vi/homeVid/hq.jpg",
+                                      "width": 480,
+                                      "height": 480
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "musicTwoRowItemRenderer": {
+                            "navigationEndpoint": {
+                              "browseEndpoint": {"browseId": "VLpl123"}
+                            },
+                            "title": {"runs": [{"text": "Playlist Andalan"}]},
+                            "subtitle": {"runs": [{"text": "Sonora"}]},
+                            "thumbnailRenderer": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": {
+                                  "thumbnails": [
+                                    {
+                                      "url": "https://i.ytimg.com/pl.jpg",
+                                      "width": 480,
+                                      "height": 480
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicCarouselShelfRenderer": {
+                      "header": {"musicCarouselShelfBasicHeaderRenderer": {}},
+                      "contents": [
+                        {
+                          "musicTwoRowItemRenderer": {
+                            "navigationEndpoint": {
+                              "browseEndpoint": {"browseId": "MPEDhistVid1"}
+                            },
+                            "title": {"runs": [{"text": "Lagu Riwayat"}]},
+                            "subtitle": {"runs": [{"text": "Artis Riwayat"}]},
+                            "thumbnailRenderer": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": {
+                                  "thumbnails": [
+                                    {
+                                      "url": "https://i.ytimg.com/vi/histVid1/hq.jpg",
+                                      "width": 480,
+                                      "height": 480
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicShelfRenderer": {
+                      "title": {"runs": [{"text": "Listen again"}]},
+                      "contents": [
+                        {
+                          "musicResponsiveListItemRenderer": {
+                            "playlistItemData": {"videoId": "homeRow"},
+                            "flexColumns": [
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": {"runs": [{"text": "Lagu Rak"}]}
+                                }
+                              },
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": {"runs": [{"text": "Artis Rak"}]}
+                                }
+                              }
+                            ],
+                            "fixedColumns": [
+                              {
+                                "musicResponsiveListItemFixedColumnRenderer": {
+                                  "text": {"runs": [{"text": "4:05"}]}
+                                }
+                              }
+                            ],
+                            "thumbnail": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": {
+                                  "thumbnails": [
+                                    {"url": "//i.ytimg.com/vi/homeRow/hq.jpg"}
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicShelfRenderer": {
+                      "title": {"runs": [{"text": "Rak kosong"}]},
+                      "contents": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+''';
+
+/// Respons search music.youtube.com: baris musicResponsiveListItemRenderer.
+const String _musicSearchJson = '''
+{
+  "contents": {
+    "sectionListRenderer": {
+      "contents": [
+        {
+          "musicShelfRenderer": {
+            "contents": [
+              {
+                "musicResponsiveListItemRenderer": {
+                  "playlistItemData": {"videoId": "searchVid"},
+                  "flexColumns": [
+                    {
+                      "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {"runs": [{"text": "Lagu Cari"}]}
+                      }
+                    },
+                    {
+                      "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {"runs": [{"text": "Artis Cari"}]}
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+''';
+
+/// Respons search www.youtube.com anonim: videoRenderer.
+const String _anonymousSearchJson = '''
+{
+  "contents": {
+    "twoColumnSearchResultsRenderer": {
+      "primaryContents": {
+        "sectionListRenderer": {
+          "contents": [
+            {
+              "itemSectionRenderer": {
+                "contents": [
+                  {
+                    "videoRenderer": {
+                      "videoId": "anonVid",
+                      "title": {"runs": [{"text": "Lagu Anonim"}]},
+                      "ownerText": {"runs": [{"text": "Artis Anonim"}]},
+                      "lengthText": {"simpleText": "3:10"},
+                      "thumbnail": {
+                        "thumbnails": [
+                          {"url": "https://i.ytimg.com/vi/anonVid/hq.jpg"}
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+''';
+
 YoutubeSession _session({String? pageId}) => YoutubeSession(
       cookie: _validCookie,
       pageId: pageId,
@@ -893,6 +1116,238 @@ void main() {
       expect(auth.accountName, 'Nama Baru');
       expect(auth.accountEmail, 'baru@example.com');
       expect(auth.accountAvatarUrl, isNull);
+    });
+  });
+
+  group('YouTubeMusicService.fetchHomeSections', () {
+    test('memarsek rak carousel, rak biasa, kartu MPED, dan judul kosong',
+        () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse(_homeJson);
+        }),
+      );
+      service.sessionProvider = () async => _session();
+
+      final List<MusicSection> sections = await service.fetchHomeSections();
+
+      // Request browse yang benar.
+      expect(captured, isNotNull);
+      expect(captured!.url.host, 'music.youtube.com');
+      expect(captured!.url.path, '/youtubei/v1/browse');
+      final Map<String, dynamic> body =
+          jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['browseId'], 'FEmusic_home');
+
+      // Rak kosong dilewati; sisanya 3 rak.
+      expect(sections, hasLength(3));
+      expect(sections[0].title, 'Quick picks');
+      expect(sections[1].title, 'For you');
+      expect(sections[2].title, 'Listen again');
+
+      // Kartu trek + kartu koleksi pada rak pertama.
+      expect(sections[0].items, hasLength(2));
+      expect(sections[0].items[0].type, 'song');
+      expect(sections[0].items[0].videoId, 'homeVid');
+      expect(sections[0].items[0].title, 'Lagu Utama');
+      expect(sections[0].items[1].type, 'playlist');
+      expect(sections[0].items[1].browseId, 'VLpl123');
+      expect(sections[0].items[1].videoId, isNull);
+
+      // Kartu riwayat MPED menjadi trek dengan videoId dari awalan.
+      expect(sections[1].items, hasLength(1));
+      expect(sections[1].items[0].type, 'song');
+      expect(sections[1].items[0].videoId, 'histVid1');
+      expect(sections[1].items[0].browseId, isNull);
+
+      // Baris responsif pada rak biasa.
+      expect(sections[2].items, hasLength(1));
+      expect(sections[2].items[0].videoId, 'homeRow');
+      expect(sections[2].items[0].duration, '4:05');
+      expect(
+        sections[2].items[0].thumbnail,
+        'https://i.ytimg.com/vi/homeRow/hq.jpg',
+      );
+      service.dispose();
+    });
+
+    test('belum masuk mengembalikan daftar kosong tanpa request', () async {
+      int calls = 0;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          calls++;
+          return _jsonResponse(_homeJson);
+        }),
+      );
+      // Tanpa sessionProvider — setara pengguna anonim.
+
+      expect(await service.fetchHomeSections(), isEmpty);
+      expect(calls, 0);
+      service.dispose();
+    });
+
+    test('kegagalan HTTP atau respons rusak mengembalikan daftar kosong',
+        () async {
+      final YouTubeMusicService failing = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"error": "server"}', 500)),
+      );
+      failing.sessionProvider = () async => _session();
+      expect(await failing.fetchHomeSections(), isEmpty);
+      failing.dispose();
+
+      final YouTubeMusicService broken = YouTubeMusicService(
+        httpClient: MockClient(
+            (http.Request request) async => _jsonResponse('bukan json')),
+      );
+      broken.sessionProvider = () async => _session();
+      expect(await broken.fetchHomeSections(), isEmpty);
+      broken.dispose();
+    });
+
+    test('membatasi jumlah rak dan item per rak', () async {
+      // 12 rak × 40 item; hasil harus dipangkas menjadi 10 rak × 30 item.
+      final List<Map<String, Object?>> shelves = <Map<String, Object?>>[];
+      for (var s = 0; s < 12; s++) {
+        shelves.add(<String, Object?>{
+          'musicShelfRenderer': <String, Object?>{
+            'title': <String, Object?>{
+              'runs': <Object?>[
+                <String, Object?>{'text': 'Rak $s'},
+              ],
+            },
+            'contents': List<Map<String, Object?>>.generate(40, (int i) {
+              return <String, Object?>{
+                'musicResponsiveListItemRenderer': <String, Object?>{
+                  'playlistItemData': <String, Object?>{
+                    'videoId': 'v${s}_$i',
+                  },
+                  'flexColumns': <Object?>[
+                    <String, Object?>{
+                      'musicResponsiveListItemFlexColumnRenderer':
+                          <String, Object?>{
+                        'text': <String, Object?>{
+                          'runs': <Object?>[
+                            <String, Object?>{'text': 'Lagu ${s}_$i'},
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              };
+            }),
+          },
+        });
+      }
+      final String cappedJson = jsonEncode(<String, dynamic>{
+        'contents': <String, dynamic>{
+          'singleColumnBrowseResultsRenderer': <String, dynamic>{
+            'tabs': <Object?>[
+              <String, dynamic>{
+                'tabRenderer': <String, dynamic>{
+                  'content': <String, dynamic>{
+                    'sectionListRenderer': <String, dynamic>{
+                      'contents': shelves,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient(
+            (http.Request request) async => _jsonResponse(cappedJson)),
+      );
+      service.sessionProvider = () async => _session();
+
+      final List<MusicSection> sections = await service.fetchHomeSections();
+
+      expect(sections, hasLength(10));
+      for (final MusicSection section in sections) {
+        expect(section.items, hasLength(30));
+      }
+      expect(sections.last.title, 'Rak 9');
+      service.dispose();
+    });
+  });
+
+  group('YouTubeMusicService.search sesi masuk', () {
+    test('rute ke music.youtube.com dengan Cookie dan Authorization',
+        () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse(_musicSearchJson);
+        }),
+      );
+      final YoutubeSession session = _session();
+      service.sessionProvider = () async => session;
+
+      final List<MusicItem> items = await service.search('lagu uji');
+
+      expect(captured, isNotNull);
+      expect(captured!.url.host, 'music.youtube.com');
+      expect(captured!.url.path, '/youtubei/v1/search');
+      expect(captured!.headers['cookie'], session.cookie);
+      expect(captured!.headers.containsKey('authorization'), isTrue);
+      final Map<String, dynamic> body =
+          jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['query'], 'lagu uji');
+      expect(items, isNotEmpty);
+      expect(items.first.videoId, 'searchVid');
+      expect(items.first.title, 'Lagu Cari');
+      service.dispose();
+    });
+
+    test('tanpa sesi tetap memakai endpoint anonim lama', () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse(_anonymousSearchJson);
+        }),
+      );
+      // Tanpa sessionProvider — setara pengguna anonim.
+
+      final List<MusicItem> items = await service.search('lagu uji');
+
+      expect(captured, isNotNull);
+      expect(captured!.url.host, 'www.youtube.com');
+      expect(captured!.url.path, '/youtubei/v1/search');
+      expect(captured!.headers.containsKey('cookie'), isFalse);
+      expect(captured!.headers.containsKey('authorization'), isFalse);
+      expect(items, hasLength(1));
+      expect(items.first.videoId, 'anonVid');
+      service.dispose();
+    });
+
+    test('gagal pada music.youtube.com jatuh ke hasil anonim', () async {
+      final List<http.Request> requests = <http.Request>[];
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          requests.add(request);
+          if (request.url.host == 'music.youtube.com') {
+            return _jsonResponse('{"error": "server"}', 500);
+          }
+          return _jsonResponse(_anonymousSearchJson);
+        }),
+      );
+      service.sessionProvider = () async => _session();
+
+      final List<MusicItem> items = await service.search('lagu uji');
+
+      expect(requests, hasLength(2));
+      expect(requests[0].url.host, 'music.youtube.com');
+      expect(requests[1].url.host, 'www.youtube.com');
+      expect(items, hasLength(1));
+      expect(items.first.videoId, 'anonVid');
+      service.dispose();
     });
   });
 }

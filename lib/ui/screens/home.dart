@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _error;
   int _generation = 0;
   SettingsStore? _settings;
+  ChangeNotifier? _auth;
 
   @override
   void didChangeDependencies() {
@@ -34,15 +35,29 @@ class _HomeScreenState extends State<HomeScreen> {
       _settings = settings..addListener(_onSettingsChanged);
       if (_sections == null && _error == null) _load();
     }
+    // Ikuti status sesi YouTube Music agar rak personal tampil saat masuk
+    // dan feed trending kembali saat keluar (pola layar Library).
+    final ChangeNotifier auth = SonoraScope.of(context).auth;
+    if (!identical(auth, _auth)) {
+      _auth?.removeListener(_onAuthChanged);
+      _auth = auth..addListener(_onAuthChanged);
+    }
   }
 
   @override
   void dispose() {
     _settings?.removeListener(_onSettingsChanged);
+    _auth?.removeListener(_onAuthChanged);
     super.dispose();
   }
 
   void _onSettingsChanged() {
+    if (!mounted) return;
+    _load();
+  }
+
+  /// Status sesi berubah (masuk/keluar) → muat ulang feed.
+  void _onAuthChanged() {
     if (!mounted) return;
     _load();
   }
@@ -53,20 +68,17 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _error = null);
     try {
       List<MusicSection> sections;
-      if (scope.settings.isConfigured) {
-        try {
-          sections = await scope.api.home();
-        } catch (_) {
-          final List<MusicItem> trending = await scope.ytService.getTrending();
-          sections = <MusicSection>[
-            MusicSection(title: 'Trending & Populer', items: trending),
-          ];
-        }
+      if (scope.auth.signedIn) {
+        // Rak personal YouTube Music untuk sesi masuk. Kosong atau gagal →
+        // jatuh ke feed proxy/trending seperti pengguna anonim.
+        final List<MusicSection> personal =
+            await scope.ytService.fetchHomeSections();
+        if (!mounted || generation != _generation) return;
+        sections = personal.isNotEmpty
+            ? personal
+            : await _loadFallbackSections(scope);
       } else {
-        final List<MusicItem> trending = await scope.ytService.getTrending();
-        sections = <MusicSection>[
-          MusicSection(title: 'Trending & Populer', items: trending),
-        ];
+        sections = await _loadFallbackSections(scope);
       }
       if (!mounted || generation != _generation) return;
       setState(() => _sections = sections);
@@ -80,6 +92,25 @@ class _HomeScreenState extends State<HomeScreen> {
             : 'Gagal memuat beranda.';
       });
     }
+  }
+
+  /// Feed lama: rak proxy Sonora bila dikonfigurasi, selain itu trending
+  /// YouTube mandiri.
+  Future<List<MusicSection>> _loadFallbackSections(SonoraScope scope) async {
+    if (scope.settings.isConfigured) {
+      try {
+        return await scope.api.home();
+      } catch (_) {
+        final List<MusicItem> trending = await scope.ytService.getTrending();
+        return <MusicSection>[
+          MusicSection(title: 'Trending & Populer', items: trending),
+        ];
+      }
+    }
+    final List<MusicItem> trending = await scope.ytService.getTrending();
+    return <MusicSection>[
+      MusicSection(title: 'Trending & Populer', items: trending),
+    ];
   }
 
   @override

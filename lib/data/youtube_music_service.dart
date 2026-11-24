@@ -66,6 +66,16 @@ class YouTubeMusicService {
   static const int _maxLibraryResults = 100;
   static const Duration _musicRequestTimeout = Duration(seconds: 20);
 
+  /// Browse ID feed beranda YouTube Music untuk sesi masuk.
+  static const String _homeBrowseId = 'FEmusic_home';
+
+  /// Batas jumlah rak beranda dan item per rak agar feed tetap ringan.
+  static const int _maxHomeShelves = 10;
+  static const int _maxHomeItemsPerShelf = 30;
+
+  /// Judul pengganti rak beranda tanpa judul (mengikuti YouTube Music).
+  static const String _homeDefaultShelfTitle = 'For you';
+
   /// User-Agent peramban untuk request innertube langsung.
   static const String _browserUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -167,12 +177,29 @@ class YouTubeMusicService {
 
   /// Melakukan pencarian lagu langsung dari YouTube tanpa perantara server.
   ///
+  /// Saat sesi YouTube Music aktif, pencarian dikirim ke innertube
+  /// music.youtube.com (klien WEB_REMIX, bercookie) agar hasil
+  /// terpersonalisasi; setiap kegagalan (status bukan 200, respons tak
+  /// terbaca, atau exception) jatuh kembali ke jalur anonim www.youtube.com
+  /// di bawah. Tanpa sesi, perilaku sama persis dengan jalur anonim lama.
+  ///
   /// Memakai innertube API secara langsung dengan parsing defensif. Parser
   /// search bawaan youtube_explode masih crash pada beberapa bentuk respons
   /// (int.parse "Streamed ..." dan getT pada viewCountText berbentuk runs).
   Future<List<MusicItem>> search(String query) async {
     final String q = query.trim();
     if (_disposed || q.isEmpty) return const <MusicItem>[];
+
+    try {
+      final YoutubeSession? session = await _sessionProvider?.call();
+      if (session != null) {
+        final List<MusicItem>? signedIn = await _searchSignedIn(q, session);
+        if (signedIn != null) return signedIn;
+        // Gagal → lanjut ke pencarian anonim di bawah.
+      }
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Sesi pencarian gagal: $e');
+    }
 
     try {
       final Uri uri =
@@ -212,6 +239,38 @@ class YouTubeMusicService {
     } catch (e) {
       debugPrint('[YouTubeMusicService] Pencarian "$query" gagal: $e');
       return const <MusicItem>[];
+    }
+  }
+
+  /// Pencarian terotorisasi via music.youtube.com (WEB_REMIX + cookie).
+  ///
+  /// Mengembalikan `null` bila gagal atau hasil kosong agar pemanggil jatuh
+  /// ke jalur anonim; query sah yang berhasil diparse tidak mungkin nihil.
+  Future<List<MusicItem>?> _searchSignedIn(
+    String query,
+    YoutubeSession session,
+  ) async {
+    try {
+      final http.Response response = await _postMusicInnertube(
+        'search',
+        <String, dynamic>{'query': query},
+        session: session,
+      );
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[YouTubeMusicService] Pencarian sesi masuk ditolak: '
+          'HTTP ${response.statusCode}',
+        );
+        return null;
+      }
+      final dynamic root = jsonDecode(utf8.decode(response.bodyBytes));
+      final List<MusicItem> items = <MusicItem>[];
+      _collectMusicRenderers(root, items);
+      if (items.isEmpty) return null;
+      return items.take(_maxSearchResults).toList(growable: false);
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Pencarian sesi masuk gagal: $e');
+      return null;
     }
   }
 
@@ -531,6 +590,105 @@ class YouTubeMusicService {
     }
   }
 
+  /// Mengambil rak-rak beranda personal YouTube Music (browse FEmusic_home).
+  ///
+  /// Hanya aktif saat sesi masuk; mengembalikan daftar kosong bila belum
+  /// masuk, request gagal, atau respons tidak dikenali. Fitur ini opsional
+  /// dan tidak boleh membuat layar Home error.
+  Future<List<MusicSection>> fetchHomeSections() async {
+    if (_disposed) return const <MusicSection>[];
+    try {
+      final YoutubeSession? session = await _sessionProvider?.call();
+      if (session == null) return const <MusicSection>[];
+      final http.Response response = await _postMusicInnertube(
+        'browse',
+        <String, dynamic>{'browseId': _homeBrowseId},
+        session: session,
+      );
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[YouTubeMusicService] Beranda ditolak: HTTP ${response.statusCode}',
+        );
+        return const <MusicSection>[];
+      }
+      final dynamic root = jsonDecode(utf8.decode(response.bodyBytes));
+      return _parseHomeSections(root);
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal mengambil beranda: $e');
+      return const <MusicSection>[];
+    }
+  }
+
+  /// Memarsek respons browse FEmusic_home menjadi rak-rak berjudul.
+  ///
+  /// Jalur renderer (pola BitChord): contents.singleColumnBrowseResults
+  /// Renderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[].
+  /// Tiap entri berupa musicCarouselShelfRenderer (kartu dua baris) atau
+  /// musicShelfRenderer (baris responsif). Bentuk tak dikenal dan rak kosong
+  /// dilewati; jumlah rak dan item per rak dibatasi agar feed ringan.
+  static List<MusicSection> _parseHomeSections(dynamic root) {
+    final Map<dynamic, dynamic>? rootMap = _asMap(root);
+    final Map<dynamic, dynamic>? contents = _asMap(rootMap?['contents']);
+    final Map<dynamic, dynamic>? singleColumn =
+        _asMap(contents?['singleColumnBrowseResultsRenderer']);
+    final List<dynamic>? tabs = _asList(singleColumn?['tabs']);
+    if (tabs == null || tabs.isEmpty) return const <MusicSection>[];
+    final Map<dynamic, dynamic>? tabRenderer =
+        _asMap(_asMap(tabs.first)?['tabRenderer']);
+    final Map<dynamic, dynamic>? sectionList = _asMap(
+      _asMap(tabRenderer?['content'])?['sectionListRenderer'],
+    );
+    final List<dynamic>? shelfNodes = _asList(sectionList?['contents']);
+    if (shelfNodes == null) return const <MusicSection>[];
+
+    final List<MusicSection> shelves = <MusicSection>[];
+    for (final dynamic node in shelfNodes) {
+      if (shelves.length >= _maxHomeShelves) break;
+      final Map<dynamic, dynamic>? shelfMap = _asMap(node);
+      if (shelfMap == null) continue;
+      final Map<dynamic, dynamic>? carousel =
+          _asMap(shelfMap['musicCarouselShelfRenderer']);
+      final Map<dynamic, dynamic>? plain =
+          _asMap(shelfMap['musicShelfRenderer']);
+      final Map<dynamic, dynamic>? shelf = carousel ?? plain;
+      if (shelf == null) continue;
+
+      // Judul rak: header carousel (musicCarouselShelfBasicHeaderRenderer)
+      // atau field title langsung pada musicShelfRenderer.
+      String title = carousel != null
+          ? _runsText(
+              _asMap(_asMap(carousel['header'])
+                  ?['musicCarouselShelfBasicHeaderRenderer'])?['title'],
+            ) ??
+            ''
+          : _runsText(plain!['title']) ?? '';
+      if (title.trim().isEmpty) title = _homeDefaultShelfTitle;
+
+      final List<dynamic>? itemNodes = _asList(shelf['contents']);
+      if (itemNodes == null || itemNodes.isEmpty) continue;
+      final List<MusicItem> items = <MusicItem>[];
+      for (final dynamic itemNode in itemNodes) {
+        if (items.length >= _maxHomeItemsPerShelf) break;
+        final Map<dynamic, dynamic>? itemMap = _asMap(itemNode);
+        if (itemMap == null) continue;
+        final Map<dynamic, dynamic>? twoRow =
+            _asMap(itemMap['musicTwoRowItemRenderer']);
+        final Map<dynamic, dynamic>? responsive =
+            _asMap(itemMap['musicResponsiveListItemRenderer']);
+        MusicItem? item;
+        if (twoRow != null) {
+          item = _musicItemFromTwoRow(twoRow);
+        } else if (responsive != null) {
+          item = _musicItemFromResponsive(responsive);
+        }
+        if (item != null) items.add(item);
+      }
+      if (items.isEmpty) continue;
+      shelves.add(MusicSection(title: title, items: items));
+    }
+    return shelves;
+  }
+
   /// Menelusuri pohon respons account_menu dan mengambil nama akun pertama.
   static String? _findAccountName(dynamic node) {
     if (node is Map<dynamic, dynamic>) {
@@ -643,29 +801,53 @@ class YouTubeMusicService {
   }
 
   /// Memetakan musicTwoRowItemRenderer (kartu grid) menjadi MusicItem.
+  ///
+  /// Kartu dapat berupa trek (watchEndpoint.videoId) atau koleksi
+  /// (browseEndpoint.browseId: playlist/album/artis). Awalan `MPED<videoId>`
+  /// menandai trek riwayat yang belum masuk katalog: videoId diambil dari
+  /// awalan tersebut dan browseId dibuang (pola BitChord). Kartu tanpa
+  /// browseId ber-videoId dengan artur melebar dianggap video.
   static MusicItem? _musicItemFromTwoRow(Map<dynamic, dynamic> renderer) {
-    final String? videoId = _plainText(
-      _asMap(_asMap(renderer['navigationEndpoint'])?['watchEndpoint'])
-          ?['videoId'],
-    );
+    final Map<dynamic, dynamic>? navigation =
+        _asMap(renderer['navigationEndpoint']);
+    String? videoId =
+        _plainText(_asMap(navigation?['watchEndpoint'])?['videoId']);
+    String? browseId =
+        _plainText(_asMap(navigation?['browseEndpoint'])?['browseId']);
+    if (browseId != null && browseId.startsWith('MPED')) {
+      videoId ??= browseId.substring(4);
+      browseId = null;
+    }
     final String title = _runsText(renderer['title']) ?? '';
-    if (videoId == null || videoId.isEmpty || title.isEmpty) return null;
+    if (title.isEmpty) return null;
+    final bool hasVideo = videoId != null && videoId.isNotEmpty;
+    final bool hasBrowse = browseId != null && browseId.isNotEmpty;
+    if (!hasVideo && !hasBrowse) return null;
     final String artist = _runsText(renderer['subtitle']) ?? '';
+    final String type = hasVideo
+        ? (!hasBrowse && _isWidescreenCard(renderer) ? 'video' : 'song')
+        : _collectionType(browseId!);
     return MusicItem(
-      type: 'song',
+      type: type,
       title: title,
       artist: artist,
       subtitle: artist.isNotEmpty ? artist : null,
       thumbnail: _musicThumbnailUrl(renderer['thumbnailRenderer']),
-      videoId: videoId,
+      videoId: hasVideo ? videoId : null,
+      browseId: hasBrowse ? browseId : null,
     );
   }
 
   /// Memetakan musicResponsiveListItemRenderer (baris daftar) menjadi
-  /// MusicItem.
+  /// MusicItem. Baris dengan videoId adalah trek ('song'); baris yang hanya
+  /// membawa browseId dipetakan sebagai koleksi (playlist/album/artis).
   static MusicItem? _musicItemFromResponsive(Map<dynamic, dynamic> renderer) {
     String? videoId =
         _plainText(_asMap(renderer['playlistItemData'])?['videoId']);
+    final String? browseId = _plainText(
+      _asMap(_asMap(renderer['navigationEndpoint'])?['browseEndpoint'])
+          ?['browseId'],
+    );
     final List<dynamic>? columns = _asList(renderer['flexColumns']);
     String title = '';
     String artist = '';
@@ -677,7 +859,10 @@ class YouTubeMusicService {
         artist = _runsText(_flexColumnText(columns[1])) ?? '';
       }
     }
-    if (videoId == null || videoId.isEmpty || title.isEmpty) return null;
+    if (title.isEmpty) return null;
+    final bool hasVideo = videoId != null && videoId.isNotEmpty;
+    final bool hasBrowse = browseId != null && browseId.isNotEmpty;
+    if (!hasVideo && !hasBrowse) return null;
     String? duration;
     final List<dynamic>? fixedColumns = _asList(renderer['fixedColumns']);
     if (fixedColumns != null && fixedColumns.isNotEmpty) {
@@ -689,12 +874,13 @@ class YouTubeMusicService {
       if (fixed != null && fixed.isNotEmpty) duration = fixed;
     }
     return MusicItem(
-      type: 'song',
+      type: hasVideo ? 'song' : _collectionType(browseId!),
       title: title,
       artist: artist,
       subtitle: artist.isNotEmpty ? artist : null,
       thumbnail: _musicThumbnailUrl(renderer['thumbnail']),
-      videoId: videoId,
+      videoId: hasVideo ? videoId : null,
+      browseId: hasVideo ? null : browseId,
       duration: duration,
     );
   }
@@ -733,6 +919,40 @@ class YouTubeMusicService {
   /// Melempar nilai ke daftar bila memungkinkan; selain itu `null`.
   static List<dynamic>? _asList(dynamic value) =>
       value is List<dynamic> ? value : null;
+
+  /// Menentukan tipe koleksi dari awalan browseId YouTube Music (pola
+  /// BitChord): MPRE/OLAK5uy_ → album, UC → artis, selain itu (VL, RD…,
+  /// campuran/radio) diasumsikan playlist.
+  static String _collectionType(String browseId) {
+    if (browseId.startsWith('MPRE') || browseId.startsWith('OLAK5uy_')) {
+      return 'album';
+    }
+    if (browseId.startsWith('UC')) return 'artist';
+    return 'playlist';
+  }
+
+  /// True bila kartu dua baris tampak seperti video: aspek 16:9 atau
+  /// thumbnail terbesarnya melebar (tidak persegi).
+  static bool _isWidescreenCard(Map<dynamic, dynamic> renderer) {
+    final dynamic aspectRatio = renderer['aspectRatio'];
+    if (aspectRatio is String && aspectRatio.contains('16_9')) return true;
+    final List<dynamic>? thumbnails = _asList(
+      _asMap(
+        _asMap(_asMap(renderer['thumbnailRenderer'])
+            ?['musicThumbnailRenderer'])?['thumbnail'],
+      )?['thumbnails'],
+    );
+    if (thumbnails == null || thumbnails.isEmpty) return false;
+    final Map<dynamic, dynamic>? last = _asMap(thumbnails.last);
+    final int? width = _intOf(last?['width']);
+    final int? height = _intOf(last?['height']);
+    if (width == null || height == null || height <= 0) return false;
+    return width > height;
+  }
+
+  /// Membaca bilangan bulat dari nilai int atau string angka.
+  static int? _intOf(dynamic value) =>
+      value is int ? value : int.tryParse('$value');
 
   /// Mengambil koleksi lagu untuk album, playlist, atau artis secara mandiri.
   ///
