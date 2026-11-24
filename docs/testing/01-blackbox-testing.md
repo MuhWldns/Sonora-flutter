@@ -129,7 +129,8 @@ Selain pengujian fungsional manual pada perangkat Android fisik/emulator, seluru
 | **`test/blackbox_ui_test.dart`** | Pengujian kotak hitam antarmuka pengguna (`WidgetTester`) mencakup seluruh 6 modul: `TC-SET`, `TC-PLY`, `TC-SRC`, `TC-LIB`, `TC-LYR`, dan `TC-BRW` dengan *in-memory test doubles* murni. | **23** | **23 Pass (100%)** | ~5 detik |
 | **`test/data_test.dart`** | Pengujian kontrak boundary lapisan data: serialisasi model, normalisasi `SettingsStore` (audio quality, equalizer, theme mode, cache limit), ketahanan `SonoraApi`, dan manipulasi direktori cache disk. | **34** | **34 Pass (100%)** | ~2 detik |
 | **`test/database_test.dart`** | Pengujian integritas basis data SQLite nyata (`databaseFactoryFfi`): *playback history limit 100*, relasi playlist, favorit, dan filter *skip 15 detik*. | **5** | **5 Pass (100%)** | ~1 detik |
-| **Total Keseluruhan** | **Suite Otomatis Sonora Flutter** | **62** | **62 Pass (100%)** | **~8 detik** |
+| **`test/youtube_auth_test.dart`** | Sesi & login YouTube Music: `sapisidHash`, `sapisidFromCookie`, `YoutubeAuthService.capture/restore/signOut`, header sesi innertube (SAPISIDHASH, `onBehalfOfUser` tanpa sufiks `\|\|`), `validateSession` berbasis status, `fetchAccountInfo` (nama/email/avatar), `fetchHomeSections`, dan pencarian sesi masuk. | **37** | **37 Pass (100%)** | ~3 detik |
+| **Total Keseluruhan** | **Suite Otomatis Sonora Flutter** | **99** | **99 Pass (100%)** | **~8 detik** |
 
 ### 3.2. Verifikasi Transmisi Aliran Audio Langsung (*E2E CDN Audio Streaming*)
 
@@ -146,6 +147,6 @@ Berdasarkan eksekusi seluruh skenario pengujian kotak hitam manual dan otomasi p
 * **Total Kasus Uji Fungsional**: 44 Kasus Uji.
 * **Jumlah Berhasil (Pass)**: 44 Kasus Uji (100%).
 * **Jumlah Gagal (Fail)**: 0 Kasus Uji (0%).
-* **Suite Otomasi Regresi**: 62 / 62 Pengujian Lulus (100% Pass, 0 Failure).
+* **Suite Otomasi Regresi**: 99 / 99 Pengujian Lulus (100% Pass, 0 Failure).
 * **Kualitas Kode Statis**: `flutter analyze` menghasilkan 0 masalah (*0 issues*).
 * **Kesimpulan Akhir**: Seluruh fitur utama aplikasi—mulai dari pemutaran audio mandiri bebas 403, manajemen cache otomatis, pencarian reaktif aman live stream, lirik sinkron, login akun YouTube Music via WebView beserta pemulihan sesi terenkripsi, beranda & pencarian personal yang otomatis kembali ke feed trending saat keluar, hingga fallback lirik *'Lirik tidak tersedia'* dengan aksi coba lagi dan persistensi offline SQLite—memenuhi spesifikasi fungsional dan siap digunakan untuk evaluasi makalah perangkat lunak.
