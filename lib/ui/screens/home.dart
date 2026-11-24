@@ -123,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       IconButton(
                         tooltip: 'Muat ulang',
                         icon: const Icon(Icons.refresh_rounded),
-                        onPressed: scope.settings.isConfigured ? _load : null,
+                        onPressed: _load,
                       ),
                     ],
                   ),
@@ -391,8 +391,21 @@ class _DailyRecommendations extends StatelessWidget {
         final topArtist = counts.entries
             .reduce((a, b) => a.value >= b.value ? a : b)
             .key;
+        final scope = SonoraScope.of(context);
         return FutureBuilder<List<MusicSection>>(
-          future: SonoraScope.of(context).api.search(topArtist),
+          future: scope.settings.isConfigured
+              ? scope.api.search(topArtist).catchError(
+                    (Object _) => scope.ytService.search(topArtist).then(
+                          (items) => <MusicSection>[
+                            MusicSection(title: topArtist, items: items),
+                          ],
+                        ),
+                  )
+              : scope.ytService.search(topArtist).then(
+                    (items) => <MusicSection>[
+                      MusicSection(title: topArtist, items: items),
+                    ],
+                  ),
           builder: (context, recommendations) {
             final matches = recommendations.data ?? const <MusicSection>[];
             final heardIds = heard
@@ -402,8 +415,7 @@ class _DailyRecommendations extends StatelessWidget {
             final items = <MusicItem>[];
             for (final section in matches) {
               for (final item in section.items) {
-                if ((item.type == 'artist' || item.type == 'album') &&
-                    !heardIds.contains(item.videoId)) {
+                if (!heardIds.contains(item.videoId)) {
                   items.add(item);
                 }
               }

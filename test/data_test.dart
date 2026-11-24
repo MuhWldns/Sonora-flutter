@@ -612,10 +612,13 @@ void main() {
       expect(uri, isNull);
       final searchResult = await service.search('');
       expect(searchResult, isEmpty);
+      final browseResult = await service.browse('');
+      expect(browseResult, isEmpty);
       service.dispose();
       // Setelah dispose, pemanggilan tetap aman dan mengembalikan fallback
       expect(await service.resolveStreamUri('test'), isNull);
       expect(await service.search('test'), isEmpty);
+      expect(await service.browse('test'), isEmpty);
     });
   });
 

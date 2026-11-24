@@ -1138,24 +1138,40 @@ class _PlaylistDetailState extends State<PlaylistDetailScreen> {
     final found = <MusicItem>[];
     for (final search in history) {
       try {
-        final sections = await scope.api.search(search.query);
-        for (final section in sections) {
-          for (final item in section.items) {
-            final id = item.videoId;
-            if (id != null && id.isNotEmpty && seen.add(id)) found.add(item);
+        List<MusicItem> results;
+        if (scope.settings.isConfigured) {
+          try {
+            final sections = await scope.api.search(search.query);
+            results = sections.expand((s) => s.items).toList();
+          } catch (_) {
+            results = await scope.ytService.search(search.query);
           }
+        } else {
+          results = await scope.ytService.search(search.query);
+        }
+        for (final item in results) {
+          final id = item.videoId;
+          if (id != null && id.isNotEmpty && seen.add(id)) found.add(item);
         }
       } catch (_) {}
       if (found.length >= 30) break;
     }
     if (found.isEmpty) {
       try {
-        final sections = await scope.api.home();
-        for (final section in sections) {
-          for (final item in section.items) {
-            final id = item.videoId;
-            if (id != null && id.isNotEmpty && seen.add(id)) found.add(item);
+        List<MusicItem> results;
+        if (scope.settings.isConfigured) {
+          try {
+            final sections = await scope.api.home();
+            results = sections.expand((s) => s.items).toList();
+          } catch (_) {
+            results = await scope.ytService.getTrending();
           }
+        } else {
+          results = await scope.ytService.getTrending();
+        }
+        for (final item in results) {
+          final id = item.videoId;
+          if (id != null && id.isNotEmpty && seen.add(id)) found.add(item);
         }
       } catch (_) {}
     }
@@ -1170,15 +1186,24 @@ class _PlaylistDetailState extends State<PlaylistDetailScreen> {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
     setState(() => _loadingRecommendations = true);
+    final scope = SonoraScope.of(context);
     try {
-      final sections = await SonoraScope.of(context).api.search(trimmed);
+      List<MusicItem> results;
+      if (scope.settings.isConfigured) {
+        try {
+          final sections = await scope.api.search(trimmed);
+          results = sections.expand((s) => s.items).toList();
+        } catch (_) {
+          results = await scope.ytService.search(trimmed);
+        }
+      } else {
+        results = await scope.ytService.search(trimmed);
+      }
       if (!mounted) return;
       final items = <MusicItem>[];
       final seen = <String>{};
-      for (final section in sections) {
-        for (final item in section.items) {
-          if (item.videoId != null && seen.add(item.videoId!)) items.add(item);
-        }
+      for (final item in results) {
+        if (item.videoId != null && seen.add(item.videoId!)) items.add(item);
       }
       setState(() {
         _recommendations = items;

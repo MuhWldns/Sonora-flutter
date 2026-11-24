@@ -117,6 +117,72 @@ class YouTubeMusicService {
     return search('Top Music Hits 2026');
   }
 
+  /// Mengambil koleksi lagu untuk album, playlist, atau artis secara mandiri.
+  ///
+  /// Bila [browseId] merupakan playlist ID (mis. diawali `VL`, `PL`, `RD`), trek
+  /// diambil langsung dari playlist YouTube (dibatasi 50 trek untuk efisiensi memori).
+  /// Bila gagal atau bukan playlist ID, dilakukan pencarian lagu relevan via [title] / [browseId].
+  Future<List<MusicSection>> browse(
+    String browseId, {
+    String? title,
+    String? type,
+    int limit = 50,
+  }) async {
+    if (_disposed || browseId.trim().isEmpty) return const <MusicSection>[];
+
+    final String cleanId = browseId.startsWith('VL')
+        ? browseId.substring(2)
+        : browseId.trim();
+
+    // 1. Coba ambil dari YouTube playlist bila ID valid.
+    try {
+      final Stream<Video> videoStream = _yt.playlists.getVideos(cleanId);
+      final List<MusicItem> items = <MusicItem>[];
+      await for (final Video video in videoStream.take(limit)) {
+        final String thumbnail = video.thumbnails.highResUrl.isNotEmpty
+            ? video.thumbnails.highResUrl
+            : video.thumbnails.standardResUrl;
+        items.add(
+          MusicItem(
+            type: 'song',
+            title: video.title,
+            artist: video.author,
+            subtitle: video.author,
+            thumbnail: thumbnail,
+            videoId: video.id.value,
+            duration: _formatDuration(video.duration),
+          ),
+        );
+      }
+      if (items.isNotEmpty) {
+        return <MusicSection>[
+          MusicSection(
+            title: title != null && title.isNotEmpty ? title : 'Daftar Lagu',
+            items: items,
+          ),
+        ];
+      }
+    } catch (_) {
+      // Abaikan galat dan lanjutkan ke fallback pencarian judul/artis.
+    }
+
+    // 2. Fallback: cari lagu berdasarkan nama judul / artis / album.
+    final String query = (title != null && title.trim().isNotEmpty)
+        ? title.trim()
+        : cleanId;
+    final List<MusicItem> searchResults = await search(query);
+    if (searchResults.isNotEmpty) {
+      return <MusicSection>[
+        MusicSection(
+          title: title != null && title.isNotEmpty ? title : 'Daftar Lagu',
+          items: searchResults,
+        ),
+      ];
+    }
+
+    return const <MusicSection>[];
+  }
+
   static String? _formatDuration(Duration? duration) {
     if (duration == null || duration <= Duration.zero) return null;
     final int total = duration.inSeconds;

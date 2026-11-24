@@ -52,10 +52,31 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Future<void> _load() async {
     final int generation = ++_generation;
     setState(() => _error = null);
+    final SonoraScope scope = SonoraScope.of(context);
     try {
-      final List<MusicSection> sections =
-          await SonoraScope.of(context).api.browse(widget.browseId);
+      List<MusicSection> sections;
+      if (scope.settings.isConfigured) {
+        try {
+          sections = await scope.api.browse(widget.browseId);
+        } catch (_) {
+          sections = await scope.ytService.browse(
+            widget.browseId,
+            title: widget.title,
+            type: widget.typeLabel,
+          );
+        }
+      } else {
+        sections = await scope.ytService.browse(
+          widget.browseId,
+          title: widget.title,
+          type: widget.typeLabel,
+        );
+      }
       if (!mounted || generation != _generation) return;
+      if (sections.isEmpty) {
+        setState(() => _error = 'Tidak ada lagu yang ditemukan.');
+        return;
+      }
       setState(() => _sections = sections);
     } catch (error) {
       if (!mounted || generation != _generation) return;
@@ -64,7 +85,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   String _message(Object error) =>
-      error is SonoraApiException ? error.message : error.toString();
+      error is SonoraApiException ? error.message : 'Gagal memuat daftar lagu.';
 
   @override
   Widget build(BuildContext context) {
