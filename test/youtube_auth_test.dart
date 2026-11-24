@@ -378,6 +378,36 @@ void main() {
       service.dispose();
     });
 
+    test('onBehalfOfUser hanya memakai bagian sebelum || dari dataSyncId',
+        () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse('{}');
+        }),
+      );
+      // DATASYNC_ID ytcfg berformat "<id>||<timestamp>"; nilai lengkap
+      // membuat account_menu menjawab HTTP 500.
+      service.sessionProvider = () async => YoutubeSession(
+            cookie: _validCookie,
+            dataSyncId: 'ds-abc%3D%3D||1732500000',
+            authUser: '0',
+            visitorData: 'visitor-1',
+            clientVersion: '1.20250101.01.00',
+          );
+
+      await service.validateSession();
+
+      final Map<String, dynamic> body =
+          jsonDecode(captured!.body) as Map<String, dynamic>;
+      final Map<String, dynamic> user =
+          (body['context'] as Map<String, dynamic>)['user']
+              as Map<String, dynamic>;
+      expect(user['onBehalfOfUser'], 'ds-abc%3D%3D');
+      service.dispose();
+    });
+
     test('tidak melampirkan Authorization/Cookie saat sesi tidak ada',
         () async {
       http.Request? captured;

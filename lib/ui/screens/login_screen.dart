@@ -166,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
     bool filled(String key) => (cfg[key] as String? ?? '').isNotEmpty;
     debugPrint(
       '[LoginScreen] Probe ytcfg terisi → '
-      'loggedIn=${cfg['loggedIn'] == '1'}, '
+      'loggedIn=${cfg['loggedIn'] == '1' || cfg['loggedIn'] == 'true'}, '
       'dataSyncId=${filled('dataSyncId')}, '
       'authUser=${filled('authUser')}, '
       'visitorData=${filled('visitorData')}, '

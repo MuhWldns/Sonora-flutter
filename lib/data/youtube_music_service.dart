@@ -456,7 +456,13 @@ class YouTubeMusicService {
           'gl': _musicGl,
         },
         if (active != null && active.dataSyncId.isNotEmpty)
-          'user': <String, dynamic>{'onBehalfOfUser': active.dataSyncId},
+          'user': <String, dynamic>{
+            // DATASYNC_ID dari ytcfg berformat "<id>||<timestamp>".
+            // Google menjawab HTTP 500 bila nilai lengkap (dengan "||")
+            // dikirim sebagai onBehalfOfUser — hanya bagian sebelum "||"
+            // yang valid (mengikuti perilaku klien web/BitChord).
+            'onBehalfOfUser': active.dataSyncId.split('||').first,
+          },
       },
       ...payload,
     };
