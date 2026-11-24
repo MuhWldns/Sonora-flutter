@@ -347,7 +347,16 @@ class YouTubeMusicService {
   /// membuat cookie yang masih valid ditolak.
   Future<bool> validateSession({YoutubeSession? session}) async {
     final http.Response? response = await _postAccountMenu(session: session);
-    return response != null && response.statusCode == 200;
+    if (response == null) return false;
+    if (response.statusCode != 200) {
+      // Diagnostik aman: hanya kode status, tanpa isi respons atau header.
+      debugPrint(
+        '[YouTubeMusicService] Validasi sesi ditolak: '
+        'HTTP ${response.statusCode}',
+      );
+      return false;
+    }
+    return true;
   }
 
   /// Mengambil nama akun YouTube Music yang sedang masuk.
@@ -462,7 +471,9 @@ class YouTubeMusicService {
           active?.clientVersion ?? _fallbackRemixClientVersion,
       if (active != null) ...<String, String>{
         'x-goog-visitor-id': active.visitorData,
-        if (active.authUser.isNotEmpty) 'x-goog-authuser': active.authUser,
+        // BitChord selalu mengirim indeks akun; "0" adalah default yang
+        // aman bila probe ytcfg gagal membaca SESSION_INDEX.
+        'x-goog-authuser': active.authUser.isNotEmpty ? active.authUser : '0',
         if (active.pageId != null && active.pageId!.isNotEmpty)
           'x-goog-pageid': active.pageId!,
         'cookie': active.cookie,

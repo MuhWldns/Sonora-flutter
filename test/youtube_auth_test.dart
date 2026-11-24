@@ -502,7 +502,7 @@ void main() {
       service.dispose();
     });
 
-    test('authUser kosong tanpa X-Goog-AuthUser; dataSyncId kosong tanpa '
+    test('authUser kosong memakai default 0; dataSyncId kosong tanpa '
         'context.user', () async {
       final List<http.Request> requests = <http.Request>[];
       final YouTubeMusicService service = YouTubeMusicService(
@@ -523,7 +523,7 @@ void main() {
 
       expect(requests, hasLength(1));
       expect(requests[0].url.path, '/youtubei/v1/account/account_menu');
-      expect(requests[0].headers.containsKey('x-goog-authuser'), isFalse);
+      expect(requests[0].headers['x-goog-authuser'], '0');
       expect(requests[0].headers.containsKey('x-goog-visitor-id'), isTrue);
       final Map<String, dynamic> body =
           jsonDecode(requests[0].body) as Map<String, dynamic>;
@@ -531,6 +531,61 @@ void main() {
         (body['context'] as Map<String, dynamic>).containsKey('user'),
         isFalse,
       );
+      service.dispose();
+    });
+
+    test('sesi dengan nilai probe kosong tetap divalidasi memakai cookie, '
+        'SAPISIDHASH, dan x-goog-authuser 0', () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse('{}');
+        }),
+      );
+      // Sesi hasil probe ytcfg yang gagal dibaca: hanya cookie yang pasti ada.
+      service.sessionProvider = () async => YoutubeSession(
+            cookie: _validCookie,
+            dataSyncId: '',
+            authUser: '',
+            visitorData: '',
+            clientVersion: '',
+          );
+
+      expect(await service.validateSession(), isTrue);
+
+      final http.Request request = captured!;
+      expect(request.url.path, '/youtubei/v1/account/account_menu');
+      expect(request.headers['cookie'], _validCookie);
+      expect(request.headers['x-goog-authuser'], '0');
+      final String authorization = request.headers['authorization']!;
+      final RegExpMatch match =
+          RegExp(r'^SAPISIDHASH (\d+)_([0-9a-f]{40})$')
+              .firstMatch(authorization)!;
+      final int timestamp = int.parse(match.group(1)!);
+      expect(
+        authorization,
+        'SAPISIDHASH ${timestamp}_'
+        '${sapisidHash('sapisid123', youtubeMusicOrigin, timestamp)}',
+      );
+      service.dispose();
+    });
+
+    test('sesi dengan nilai probe kosong tetap ditolak saat HTTP 401',
+        () async {
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"error": "unauthorized"}', 401)),
+      );
+      service.sessionProvider = () async => YoutubeSession(
+            cookie: _validCookie,
+            dataSyncId: '',
+            authUser: '',
+            visitorData: '',
+            clientVersion: '',
+          );
+
+      expect(await service.validateSession(), isFalse);
       service.dispose();
     });
   });

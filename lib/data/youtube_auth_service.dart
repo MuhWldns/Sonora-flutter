@@ -62,9 +62,21 @@ class YoutubeAuthService extends ChangeNotifier {
       clientVersion: clientVersion,
     );
     // Tanpa keluarga SAPISID berarti belum masuk — tolak tanpa notifikasi.
-    if (YoutubeSession.sapisidFromCookie(session.cookie) == null) return false;
+    if (YoutubeSession.sapisidFromCookie(session.cookie) == null) {
+      // Diagnostik aman: tahap penolakan dicatat tanpa nilai cookie.
+      debugPrint(
+        '[YoutubeAuthService] Capture ditolak: cookie tanpa keluarga SAPISID',
+      );
+      return false;
+    }
     final Future<bool> Function(YoutubeSession)? validator = validate;
-    if (validator != null && !(await validator(session))) return false;
+    if (validator != null && !(await validator(session))) {
+      // Diagnostik aman: validator menolak (mis. HTTP non-200).
+      debugPrint(
+        '[YoutubeAuthService] Capture ditolak: validator menolak sesi',
+      );
+      return false;
+    }
     try {
       await store.write(jsonEncode(session.toJson()));
     } catch (e) {

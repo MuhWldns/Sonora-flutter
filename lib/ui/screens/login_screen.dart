@@ -63,21 +63,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   NavigationDecision _onNavigationRequest(NavigationRequest request) {
-    _updateMusicHost(Uri.tryParse(request.url));
+    // Navigasi menjauh dari Music langsung menonaktifkan tombol. Penandaan
+    // "berada di Music" tidak pernah diaktifkan di sini — saat request
+    // navigasi dimulai halaman bisa jadi belum selesai dimuat sehingga
+    // cookie dan ytcfg sesi belum lengkap.
+    final bool onMusic =
+        Uri.tryParse(request.url)?.host.contains(_kMusicHost) ?? false;
+    if (!onMusic) {
+      _setMusicHost(false);
+    }
     // Biarkan semua navigasi berjalan; penangkapan sesi dilakukan manual
     // lewat tombol "Gunakan Akun".
     return NavigationDecision.navigate;
   }
 
   void _onPageFinished(String url) {
-    _updateMusicHost(Uri.tryParse(url));
+    // Tombol hanya aktif setelah halaman Music selesai dimuat penuh agar
+    // cookie dan ytcfg sesi sudah benar-benar tersedia.
+    _setMusicHost(
+      Uri.tryParse(url)?.host.contains(_kMusicHost) ?? false,
+    );
   }
 
   /// Memperbarui penanda halaman Music; hanya membangun ulang saat berubah.
-  void _updateMusicHost(Uri? uri) {
-    final bool onMusic = uri != null && uri.host.contains(_kMusicHost);
-    if (mounted && onMusic != _onMusicHost) {
-      setState(() => _onMusicHost = onMusic);
+  void _setMusicHost(bool value) {
+    if (mounted && value != _onMusicHost) {
+      setState(() => _onMusicHost = value);
     }
   }
 
@@ -94,12 +105,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final String cookieHeader =
           cookies.map((c) => '${c.name}=${c.value}').join('; ');
+      // Diagnostik aman: hanya jumlah + nama cookie, nilai tidak dicatat.
+      _logCookieNames(cookies.map((c) => c.name).toList());
 
       // 2) Probe ytcfg dari halaman yang sudah termuat.
       final Object result = await _controller.runJavaScriptReturningResult(
         _kYtcfgProbe,
       );
       final Map<String, dynamic> cfg = _parseProbe(result);
+      // Diagnostik aman: hanya status terisi tiap kolom, tanpa nilainya.
+      _logProbeFields(cfg);
 
       // 3) Serahkan ke service; service yang memutuskan validitas sesi.
       final String pageId = cfg['pageId'] as String? ?? '';
@@ -128,16 +143,55 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Diagnostik aman: hanya nama cookie (tanpa nilai) untuk memastikan
+  /// keluarga SAPISID ikut tertangkap oleh WebView.
+  void _logCookieNames(List<String> names) {
+    const List<String> sapisidNames = <String>[
+      'SAPISID',
+      '__Secure-3PAPISID',
+      '__Secure-1PAPISID',
+    ];
+    final String sapisidStatus = sapisidNames
+        .map((String name) => '$name=${names.contains(name)}')
+        .join(', ');
+    debugPrint(
+      '[LoginScreen] Cookie musik: ${names.length} buah; '
+      'keluarga SAPISID → $sapisidStatus',
+    );
+  }
+
+  /// Diagnostik aman: hanya melaporkan kolom probe yang terisi (boolean),
+  /// tanpa mencatat nilainya.
+  void _logProbeFields(Map<String, dynamic> cfg) {
+    bool filled(String key) => (cfg[key] as String? ?? '').isNotEmpty;
+    debugPrint(
+      '[LoginScreen] Probe ytcfg terisi → '
+      'loggedIn=${cfg['loggedIn'] == '1'}, '
+      'dataSyncId=${filled('dataSyncId')}, '
+      'authUser=${filled('authUser')}, '
+      'visitorData=${filled('visitorData')}, '
+      'clientVersion=${filled('clientVersion')}',
+    );
+  }
+
   /// `runJavaScriptReturningResult` dapat mengembalikan String JSON,
   /// bool, atau num — normalisasi menjadi peta yang aman.
+  ///
+  /// Di Android hasil String dikemas sebagai JSON terenkode dua kali
+  /// (`"\"{\\\"loggedIn\\\":\\\"1\\\"}\""`), sehingga perlu didekode
+  /// maksimal dua kali sampai berbentuk peta; hasil non-peta dianggap
+  /// gagal dan mengembalikan peta kosong.
   Map<String, dynamic> _parseProbe(Object result) {
     try {
-      final String raw = result is String ? result : result.toString();
-      final String trimmed = raw.trim();
-      if (trimmed.isEmpty || trimmed == 'null') {
-        return const <String, dynamic>{};
+      Object? decoded =
+          result is String ? result.trim() : result.toString().trim();
+      for (int attempt = 0; attempt < 2 && decoded is String; attempt++) {
+        final String trimmed = decoded.trim();
+        if (trimmed.isEmpty || trimmed == 'null') {
+          return const <String, dynamic>{};
+        }
+        decoded = jsonDecode(trimmed);
       }
-      final Object? decoded = jsonDecode(trimmed);
       return decoded is Map<String, dynamic>
           ? decoded
           : const <String, dynamic>{};
