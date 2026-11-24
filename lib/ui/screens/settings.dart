@@ -14,6 +14,7 @@ import '../../data/sonora_api.dart';
 import '../app_scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'login_screen.dart';
 
 enum _TestState { idle, testing, ok, fail }
 
@@ -49,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   AndroidEqualizerParameters? _eqParams;
   List<double> _eqGains = const <double>[0, 0, 0, 0, 0];
   bool _clearingHistory = false;
+  bool _signingOut = false;
 
   @override
   void initState() {
@@ -366,6 +368,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: kSpaceXl),
+                  _authCard(context, scope),
                   const SizedBox(height: kSpaceXl),
                   _audioSection(context, scope),
                   const SizedBox(height: kSpaceXl),
@@ -877,6 +881,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showSonoraSnack(context, 'Gagal membersihkan riwayat.');
     } finally {
       if (mounted) setState(() => _clearingHistory = false);
+    }
+  }
+
+  /// Kartu akun YouTube Music: status sesi + aksi masuk/keluar.
+  /// Dibungkus [ListenableBuilder] agar diperbarui saat sesi berubah.
+  Widget _authCard(BuildContext context, SonoraScope scope) {
+    return ListenableBuilder(
+      listenable: scope.auth,
+      builder: (BuildContext context, Widget? _) {
+        final bool signedIn = scope.auth.signedIn;
+        final String account = scope.auth.accountName ?? '';
+        return _settingsCard(
+          context,
+          icon: Icons.account_circle_rounded,
+          title: 'Akun YouTube Music',
+          subtitle: signedIn
+              ? (account.isNotEmpty ? account : 'Akun Google')
+              : 'Masuk untuk membuka lagu yang disukai, riwayat, '
+                  'dan playlist kamu.',
+          children: <Widget>[
+            if (signedIn)
+              OutlinedButton.icon(
+                onPressed: _signingOut ? null : _confirmSignOut,
+                icon: _signingOut
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.logout_rounded, size: 20),
+                label: const Text('Keluar'),
+              )
+            else
+              FilledButton.icon(
+                onPressed: _openLogin,
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Masuk'),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Membuka layar login WebView (halaman penuh).
+  Future<void> _openLogin() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const LoginScreen(),
+      ),
+    );
+  }
+
+  /// Konfirmasi keluar akun lalu mengakhiri sesi YouTube Music.
+  Future<void> _confirmSignOut() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Keluar dari akun YouTube Music?'),
+        content: const Text(
+          'Lagu yang disukai, riwayat, dan playlist dari akun YouTube Music '
+          'tidak akan lagi dimuat di aplikasi.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    setState(() => _signingOut = true);
+    try {
+      await SonoraScope.of(context).auth.signOut();
+      if (!mounted) return;
+      showSonoraSnack(context, 'Sudah keluar');
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
     }
   }
 

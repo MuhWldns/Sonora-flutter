@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import 'music_models.dart';
+import 'youtube_session.dart';
 
 /// Item cache stream URL direct dari YouTube CDN (GoogleVideo).
 class _CachedStream {
@@ -34,6 +35,11 @@ class YouTubeMusicService {
   final Map<String, _CachedStream> _streamCache = <String, _CachedStream>{};
   bool _disposed = false;
 
+  /// Penyedia sesi aktif untuk request terotorisasi (disetel dari bootstrap).
+  Future<YoutubeSession?> Function()? _sessionProvider;
+  set sessionProvider(Future<YoutubeSession?> Function()? provider) =>
+      _sessionProvider = provider;
+
   /// Masa aktif cache URL stream (token googlevideo valid ~4-6 jam).
   static const Duration _cacheTtl = Duration(hours: 4);
 
@@ -47,6 +53,22 @@ class YouTubeMusicService {
       'https://www.youtube.com/youtubei/v1/search';
   static const String _innertubeKey = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
   static const int _maxSearchResults = 30;
+
+  /// Basis endpoint innertube YouTube Music (klien WEB_REMIX).
+  static const String _musicInnertubeBase =
+      'https://music.youtube.com/youtubei/v1/';
+  static const String _remixClientName = 'WEB_REMIX';
+
+  /// Versi klien cadangan saat request dikirim tanpa sesi aktif.
+  static const String _fallbackRemixClientVersion = '1.20250331.01.00';
+  static const String _musicHl = 'en';
+  static const String _musicGl = 'US';
+  static const int _maxLibraryResults = 100;
+  static const Duration _musicRequestTimeout = Duration(seconds: 20);
+
+  /// User-Agent peramban untuk request innertube langsung.
+  static const String _browserUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   /// Mengambil direct stream URI sesuai preferensi [quality].
   ///
@@ -160,8 +182,7 @@ class YouTubeMusicService {
             uri,
             headers: const <String, String>{
               'content-type': 'application/json; charset=utf-8',
-              'user-agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'user-agent': _browserUserAgent,
             },
             body: jsonEncode(<String, dynamic>{
               'context': <String, dynamic>{
@@ -301,6 +322,292 @@ class YouTubeMusicService {
   Future<List<MusicItem>> getTrending() async {
     return search('Top Music Hits 2026');
   }
+
+  /// Mengambil nama akun YouTube Music yang sedang masuk.
+  ///
+  /// [session] opsional dipakai untuk memvalidasi kandidat sesi sebelum
+  /// dijadikan sesi aktif. Mengembalikan `null` bila gagal atau belum masuk.
+  Future<String?> fetchAccountName({YoutubeSession? session}) async {
+    if (_disposed) return null;
+    try {
+      final http.Response response = await _postMusicInnertube(
+        'account/account_menu',
+        const <String, dynamic>{},
+        session: session,
+      );
+      if (response.statusCode != 200) return null;
+      return _findAccountName(jsonDecode(utf8.decode(response.bodyBytes)));
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal mengambil nama akun: $e');
+      return null;
+    }
+  }
+
+  /// Mengambil daftar video yang disukai dari akun YouTube Music.
+  ///
+  /// Daftar kosong dikembalikan bila gagal atau belum masuk — fitur ini
+  /// opsional dan tidak boleh membuat UI error.
+  Future<List<MusicItem>> fetchLiked() =>
+      _fetchAccountBrowse('FEmusic_liked_videos');
+
+  /// Mengambil riwayat putar dari akun YouTube Music.
+  Future<List<MusicItem>> fetchHistory() =>
+      _fetchAccountBrowse('FEmusic_history');
+
+  /// Menyukai video memakai endpoint `like/like`.
+  ///
+  /// Mengembalikan `true` bila server menerima request.
+  Future<bool> likeVideo(String videoId) async {
+    final String id = videoId.trim();
+    if (_disposed || id.isEmpty) return false;
+    try {
+      final http.Response response = await _postMusicInnertube(
+        'like/like',
+        <String, dynamic>{
+          'target': <String, dynamic>{'videoId': id},
+          'action': 'like/like',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal menyukai $id: $e');
+      return false;
+    }
+  }
+
+  /// Membuat playlist pribadi baru memakai endpoint `playlist/create`.
+  Future<bool> createPlaylist(String title) async {
+    final String cleanTitle = title.trim();
+    if (_disposed || cleanTitle.isEmpty) return false;
+    try {
+      final http.Response response = await _postMusicInnertube(
+        'playlist/create',
+        <String, dynamic>{
+          'title': cleanTitle,
+          'privacyStatus': 'PRIVATE',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal membuat playlist: $e');
+      return false;
+    }
+  }
+
+  /// Mengirim POST innertube YouTube Music dengan header sesi bila ada.
+  ///
+  /// Tanpa sesi aktif, request tetap dikirim sebagai pengguna anonim tanpa
+  /// Cookie/Authorization. Header mengikuti pola BitChord (Innertube.kt):
+  /// SAPISIDHASH per request, X-YouTube-Client-Name 67 (WEB_REMIX), serta
+  /// X-Goog-Visitor-Id/AuthUser/PageId dari ytcfg.
+  Future<http.Response> _postMusicInnertube(
+    String endpoint,
+    Map<String, dynamic> payload, {
+    YoutubeSession? session,
+  }) async {
+    final YoutubeSession? active = session ?? await _sessionProvider?.call();
+    final int timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final String? sapisid =
+        active == null ? null : YoutubeSession.sapisidFromCookie(active.cookie);
+    final Uri uri = Uri.parse('$_musicInnertubeBase$endpoint').replace(
+      queryParameters: <String, String>{
+        'prettyPrint': 'false',
+        'hl': _musicHl,
+      },
+    );
+    final Map<String, dynamic> body = <String, dynamic>{
+      'context': <String, dynamic>{
+        'client': <String, dynamic>{
+          'clientName': _remixClientName,
+          'clientVersion': active?.clientVersion ?? _fallbackRemixClientVersion,
+          'hl': _musicHl,
+          'gl': _musicGl,
+        },
+        if (active != null)
+          'user': <String, dynamic>{'onBehalfOfUser': active.dataSyncId},
+      },
+      ...payload,
+    };
+    final Map<String, String> headers = <String, String>{
+      'content-type': 'application/json; charset=utf-8',
+      'user-agent': _browserUserAgent,
+      'x-origin': youtubeMusicOrigin,
+      'origin': youtubeMusicOrigin,
+      'referer': '$youtubeMusicOrigin/',
+      'x-youtube-client-name': '67',
+      'x-youtube-client-version':
+          active?.clientVersion ?? _fallbackRemixClientVersion,
+      if (active != null) ...<String, String>{
+        'x-goog-visitor-id': active.visitorData,
+        'x-goog-authuser': active.authUser,
+        if (active.pageId != null && active.pageId!.isNotEmpty)
+          'x-goog-pageid': active.pageId!,
+        'cookie': active.cookie,
+        if (sapisid != null)
+          'authorization':
+              'SAPISIDHASH ${timestamp}_${sapisidHash(sapisid, youtubeMusicOrigin, timestamp)}',
+      },
+    };
+    return _http
+        .post(uri, headers: headers, body: jsonEncode(body))
+        .timeout(_musicRequestTimeout);
+  }
+
+  /// Mengambil isi koleksi akun (disukai/riwayat) lewat endpoint browse.
+  Future<List<MusicItem>> _fetchAccountBrowse(String browseId) async {
+    if (_disposed) return const <MusicItem>[];
+    try {
+      final http.Response response = await _postMusicInnertube(
+        'browse',
+        <String, dynamic>{'browseId': browseId},
+      );
+      if (response.statusCode != 200) return const <MusicItem>[];
+      final dynamic root = jsonDecode(utf8.decode(response.bodyBytes));
+      final List<MusicItem> items = <MusicItem>[];
+      _collectMusicRenderers(root, items);
+      return items;
+    } catch (e) {
+      debugPrint('[YouTubeMusicService] Gagal mengambil $browseId: $e');
+      return const <MusicItem>[];
+    }
+  }
+
+  /// Menelusuri pohon respons account_menu dan mengambil nama akun pertama.
+  static String? _findAccountName(dynamic node) {
+    if (node is Map<dynamic, dynamic>) {
+      final String? name = _runsText(node['accountName']);
+      if (name != null && name.isNotEmpty) return name;
+      for (final dynamic child in node.values) {
+        final String? found = _findAccountName(child);
+        if (found != null) return found;
+      }
+    } else if (node is List<dynamic>) {
+      for (final dynamic child in node) {
+        final String? found = _findAccountName(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  /// Menelusuri seluruh pohon respons innertube dan mengumpulkan renderer
+  /// musik (musicTwoRowItemRenderer / musicResponsiveListItemRenderer).
+  static void _collectMusicRenderers(dynamic node, List<MusicItem> out) {
+    if (out.length >= _maxLibraryResults) return;
+    if (node is Map<dynamic, dynamic>) {
+      final dynamic twoRow = node['musicTwoRowItemRenderer'];
+      if (twoRow is Map<dynamic, dynamic>) {
+        final MusicItem? item = _musicItemFromTwoRow(twoRow);
+        if (item != null) out.add(item);
+      }
+      final dynamic responsive = node['musicResponsiveListItemRenderer'];
+      if (responsive is Map<dynamic, dynamic>) {
+        final MusicItem? item = _musicItemFromResponsive(responsive);
+        if (item != null) out.add(item);
+      }
+      for (final dynamic child in node.values) {
+        _collectMusicRenderers(child, out);
+        if (out.length >= _maxLibraryResults) return;
+      }
+    } else if (node is List<dynamic>) {
+      for (final dynamic child in node) {
+        _collectMusicRenderers(child, out);
+        if (out.length >= _maxLibraryResults) return;
+      }
+    }
+  }
+
+  /// Memetakan musicTwoRowItemRenderer (kartu grid) menjadi MusicItem.
+  static MusicItem? _musicItemFromTwoRow(Map<dynamic, dynamic> renderer) {
+    final String? videoId = _plainText(
+      _asMap(_asMap(renderer['navigationEndpoint'])?['watchEndpoint'])
+          ?['videoId'],
+    );
+    final String title = _runsText(renderer['title']) ?? '';
+    if (videoId == null || videoId.isEmpty || title.isEmpty) return null;
+    final String artist = _runsText(renderer['subtitle']) ?? '';
+    return MusicItem(
+      type: 'song',
+      title: title,
+      artist: artist,
+      subtitle: artist.isNotEmpty ? artist : null,
+      thumbnail: _musicThumbnailUrl(renderer['thumbnailRenderer']),
+      videoId: videoId,
+    );
+  }
+
+  /// Memetakan musicResponsiveListItemRenderer (baris daftar) menjadi
+  /// MusicItem.
+  static MusicItem? _musicItemFromResponsive(Map<dynamic, dynamic> renderer) {
+    String? videoId =
+        _plainText(_asMap(renderer['playlistItemData'])?['videoId']);
+    final List<dynamic>? columns = _asList(renderer['flexColumns']);
+    String title = '';
+    String artist = '';
+    if (columns != null && columns.isNotEmpty) {
+      final Map<dynamic, dynamic>? titleText = _flexColumnText(columns.first);
+      title = _runsText(titleText) ?? '';
+      videoId ??= _videoIdFromRuns(titleText);
+      if (columns.length > 1) {
+        artist = _runsText(_flexColumnText(columns[1])) ?? '';
+      }
+    }
+    if (videoId == null || videoId.isEmpty || title.isEmpty) return null;
+    String? duration;
+    final List<dynamic>? fixedColumns = _asList(renderer['fixedColumns']);
+    if (fixedColumns != null && fixedColumns.isNotEmpty) {
+      final Map<dynamic, dynamic>? fixedText = _asMap(
+        _asMap(fixedColumns.first)
+            ?['musicResponsiveListItemFixedColumnRenderer']?['text'],
+      );
+      final String? fixed = _runsText(fixedText);
+      if (fixed != null && fixed.isNotEmpty) duration = fixed;
+    }
+    return MusicItem(
+      type: 'song',
+      title: title,
+      artist: artist,
+      subtitle: artist.isNotEmpty ? artist : null,
+      thumbnail: _musicThumbnailUrl(renderer['thumbnail']),
+      videoId: videoId,
+      duration: duration,
+    );
+  }
+
+  /// Mengambil node teks dari satu kolom responsif innertube.
+  static Map<dynamic, dynamic>? _flexColumnText(dynamic column) => _asMap(
+        _asMap(_asMap(column)?['musicResponsiveListItemFlexColumnRenderer'])
+            ?['text'],
+      );
+
+  /// Mengambil videoId dari run pertama (`navigationEndpoint.watchEndpoint`).
+  static String? _videoIdFromRuns(dynamic textNode) {
+    final List<dynamic>? runs = _asList(_asMap(textNode)?['runs']);
+    if (runs == null || runs.isEmpty) return null;
+    return _plainText(
+      _asMap(_asMap(_asMap(runs.first)?['navigationEndpoint'])
+          ?['watchEndpoint'])?['videoId'],
+    );
+  }
+
+  /// Mengambil URL thumbnail terbesar dari node thumbnail innertube.
+  static String? _musicThumbnailUrl(dynamic node) {
+    final List<dynamic>? thumbnails = _asList(_asMap(
+      _asMap(_asMap(node)?['musicThumbnailRenderer'])?['thumbnail'],
+    )?['thumbnails']);
+    if (thumbnails == null || thumbnails.isEmpty) return null;
+    final String? url = _plainText(_asMap(thumbnails.last)?['url']);
+    if (url == null || url.isEmpty) return null;
+    return url.startsWith('//') ? 'https:$url' : url;
+  }
+
+  /// Melempar nilai ke peta bila memungkinkan; selain itu `null`.
+  static Map<dynamic, dynamic>? _asMap(dynamic value) =>
+      value is Map<dynamic, dynamic> ? value : null;
+
+  /// Melempar nilai ke daftar bila memungkinkan; selain itu `null`.
+  static List<dynamic>? _asList(dynamic value) =>
+      value is List<dynamic> ? value : null;
 
   /// Mengambil koleksi lagu untuk album, playlist, atau artis secara mandiri.
   ///

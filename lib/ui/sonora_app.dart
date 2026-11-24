@@ -1,7 +1,7 @@
 /// Titik masuk UI Sonora.
 ///
 /// Konstruktor persis seperti yang dipanggil `lib/main.dart`:
-/// `SonoraApp(settings:, api:, audio:, database:)`. Widget ini memasang tema
+/// `SonoraApp(settings:, api:, audio:, ytService:, auth:, database:)`. Widget ini memasang tema
 /// Nocturne (dark atmosferik + derivasi terang, aksen crimson), menyediakan
 /// dependensi ke subtree, dan merakit pemutar + navigasi.
 library;
@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../data/local_database.dart';
 import '../data/settings_store.dart';
 import '../data/sonora_api.dart';
+import '../data/youtube_auth_service.dart';
 import '../data/youtube_music_service.dart';
 import '../playback/sonora_audio_handler.dart';
 import 'app_scope.dart';
@@ -25,6 +26,7 @@ class SonoraApp extends StatefulWidget {
     required this.api,
     required this.audio,
     required this.ytService,
+    required this.auth,
     this.database,
   });
 
@@ -32,6 +34,7 @@ class SonoraApp extends StatefulWidget {
   final SonoraApi api;
   final SonoraAudioHandler audio;
   final YouTubeMusicService ytService;
+  final YoutubeAuthService auth;
   final LocalDatabase? database;
 
   @override
@@ -60,6 +63,7 @@ class _SonoraAppState extends State<SonoraApp> {
       settings: widget.settings,
       api: widget.api,
       ytService: widget.ytService,
+      auth: widget.auth,
       player: _player,
       tabs: _tabs,
       database: widget.database,

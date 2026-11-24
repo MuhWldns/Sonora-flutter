@@ -61,6 +61,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _loading = true;
   bool _loadingStats = false;
   AppTabController? _tabs;
+  ChangeNotifier? _auth;
+  bool _loadingPersonal = false;
+  List<MusicItem> _liked = const <MusicItem>[];
+  List<MusicItem> _history = const <MusicItem>[];
 
   @override
   void didChangeDependencies() {
@@ -70,12 +74,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _tabs?.removeListener(_onTabChanged);
       _tabs = tabs..addListener(_onTabChanged);
     }
+    final ChangeNotifier auth = SonoraScope.of(context).auth;
+    if (!identical(auth, _auth)) {
+      _auth?.removeListener(_onAuthChanged);
+      _auth = auth..addListener(_onAuthChanged);
+    }
     if (_playlists.isEmpty && _loading) _load();
+    if (SonoraScope.of(context).auth.signedIn) _loadPersonal();
   }
 
   @override
   void dispose() {
     _tabs?.removeListener(_onTabChanged);
+    _auth?.removeListener(_onAuthChanged);
     super.dispose();
   }
 
@@ -83,6 +94,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (_tabs?.index == AppTabs.library) {
       _load();
       if (_filter == 'Statistik') _loadStats();
+      // Segarkan seksi personal juga (berfungsi sebagai coba lagi).
+      if (SonoraScope.of(context).auth.signedIn) _loadPersonal();
     }
   }
 
@@ -114,6 +127,81 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _stats = stats;
       _loadingStats = false;
     });
+  }
+
+  /// Dipanggil saat status sesi YouTube Music berubah: muat seksi personal
+  /// saat masuk, kosongkan saat keluar.
+  void _onAuthChanged() {
+    if (!mounted) return;
+    if (SonoraScope.of(context).auth.signedIn) {
+      _loadPersonal();
+    } else {
+      setState(() {
+        _liked = const <MusicItem>[];
+        _history = const <MusicItem>[];
+        _loadingPersonal = false;
+      });
+    }
+  }
+
+  /// Memuat lagu disukai + riwayat dari YouTube Music secara lazy.
+  /// Daftar kosong berarti gagal/kosong — seksi disembunyikan, tanpa crash.
+  Future<void> _loadPersonal() async {
+    if (_loadingPersonal) return;
+    if (!SonoraScope.of(context).auth.signedIn) return;
+    setState(() => _loadingPersonal = true);
+    try {
+      final scope = SonoraScope.of(context);
+      final results =
+          await Future.wait<List<MusicItem>>(<Future<List<MusicItem>>>[
+        scope.ytService.fetchLiked(),
+        scope.ytService.fetchHistory(),
+      ]);
+      if (!mounted) return;
+      if (!SonoraScope.of(context).auth.signedIn) return;
+      setState(() {
+        _liked = results[0];
+        _history = results[1];
+        _loadingPersonal = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _liked = const <MusicItem>[];
+        _history = const <MusicItem>[];
+        _loadingPersonal = false;
+      });
+    }
+  }
+
+  /// Sliver seksi personal (Disukai/Riwayat) memakai pola rak yang ada.
+  /// Kosong/gagal → seksi disembunyikan seluruhnya.
+  List<Widget> _personalSectionSlivers({
+    required String title,
+    required bool loading,
+    required List<MusicItem> items,
+  }) {
+    if (!loading && items.isEmpty) return const <Widget>[];
+    return <Widget>[
+      SliverToBoxAdapter(child: SectionHeader(title: title)),
+      if (loading)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: kSpaceLg,
+              vertical: kSpaceLg,
+            ),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        )
+      else
+        SliverToBoxAdapter(
+          child: MusicShelf(
+            items: items,
+            onOpen: (MusicItem item) => PlayerActions.of(context).play(item),
+          ),
+        ),
+    ];
   }
 
   String get _sortLabel => switch (_sort) {
@@ -326,6 +414,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               ),
             ),
+            if (SonoraScope.of(context).auth.signedIn) ...<Widget>[
+              ..._personalSectionSlivers(
+                title: 'Disukai',
+                loading: _loadingPersonal && _liked.isEmpty,
+                items: _liked,
+              ),
+              ..._personalSectionSlivers(
+                title: 'Riwayat',
+                loading: _loadingPersonal && _history.isEmpty,
+                items: _history,
+              ),
+            ],
             if (isStats) ...<Widget>[
               SliverToBoxAdapter(
                 child: _StatsView(
