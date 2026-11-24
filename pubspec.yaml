@@ -57,6 +57,15 @@ dev_dependencies:
   shared_preferences_platform_interface: ^2.4.2
   sqflite_common_ffi: ^2.4.3
 
+# 3.1.0 (pub) return 403 untuk semua stream (YouTube mewajibkan poToken
+# untuk client lama) dan gagal mem-parse hasil pencarian berbentuk baru.
+# Master memakai client visionOS yang tidak butuh poToken + perbaikan parse.
+dependency_overrides:
+  youtube_explode_dart:
+    git:
+      url: https://github.com/Hexer10/youtube_explode_dart.git
+      ref: 44a39a65d8e274806247d52af8f0bacd77691d38
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

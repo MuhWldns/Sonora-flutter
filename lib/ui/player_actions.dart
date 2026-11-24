@@ -80,10 +80,13 @@ class PlayerActions {
               ),
             ),
             for (final row in playlists)
-              ListTile(
-                leading: const Icon(Icons.queue_music_rounded),
-                title: Text(row['name'] as String? ?? ''),
-                onTap: () => Navigator.pop(context, row['id'] as String),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.queue_music_rounded),
+                  title: Text(row['name'] as String? ?? ''),
+                  onTap: () => Navigator.pop(context, row['id'] as String),
+                ),
               ),
             if (playlists.isEmpty)
               const Padding(

@@ -162,7 +162,10 @@ class GlassContainer extends StatelessWidget {
 }
 
 /// Membangun tema Sonora untuk [brightness] tertentu.
-ThemeData buildSonoraTheme(Brightness brightness) {
+ThemeData buildSonoraTheme(
+  Brightness brightness, {
+  bool useGoogleFonts = true,
+}) {
   final bool dark = brightness == Brightness.dark;
   final ColorScheme base = ColorScheme.fromSeed(
     seedColor: kAccent,
@@ -257,8 +260,10 @@ ThemeData buildSonoraTheme(Brightness brightness) {
 
   // Plus Jakarta Sans: display 28-32/800, section 20-22/700, item 16/600,
   // body 14/400, caption 11-12/500, overline 10/700 (+0.08em).
-  final TextTheme text = GoogleFonts.plusJakartaSansTextTheme(scaffold.textTheme)
-      .copyWith(
+  final TextTheme baseText = useGoogleFonts
+      ? GoogleFonts.plusJakartaSansTextTheme(scaffold.textTheme)
+      : scaffold.textTheme;
+  final TextTheme text = baseText.copyWith(
     displaySmall: scaffold.textTheme.displaySmall?.copyWith(
       fontSize: 30,
       fontWeight: FontWeight.w800,

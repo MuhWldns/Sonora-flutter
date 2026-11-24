@@ -27,7 +27,17 @@ import '../data/youtube_music_service.dart';
 /// carries no error processing state of its own). Fire-and-forget calls
 /// swallow [PlayerInterruptedException] (expected when a newer request
 /// supersedes an in-flight one) but never let other failures escape unhandled.
-class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
+/// Antarmuka pemutar audio Sonora yang dikonsumsi oleh lapisan UI.
+abstract interface class SonoraPlaybackHandler implements AudioHandler {
+  ValueListenable<String?> get error;
+  Stream<Duration> get positionStream;
+  Duration get position;
+  Future<void> playItems(List<MusicItem> items, {int startIndex = 0});
+}
+
+class SonoraAudioHandler extends BaseAudioHandler
+    with SeekHandler
+    implements SonoraPlaybackHandler {
   SonoraAudioHandler({
     SonoraApi? api,
     YouTubeMusicService? ytService,
@@ -58,6 +68,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
       StreamController<Duration>.broadcast();
 
   /// Last playback failure, or `null` when there is no error to show.
+  @override
   final ValueNotifier<String?> error = ValueNotifier<String?>(null);
 
   /// Signature of the queue currently applied, used to ignore duplicate
@@ -78,9 +89,11 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   bool _disposed = false;
 
   /// The most recent position reported by the player.
+  @override
   Duration get position => _player.position;
 
   /// Position updates for the seek bar.
+  @override
   Stream<Duration> get positionStream => _positionController.stream;
 
   /// Configures the audio session and starts the background service.
@@ -136,6 +149,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Unplayable items are filtered out; the identity of the requested start
   /// item is preserved by looking it up in the filtered list. Repeated calls
   /// with an identical queue are idempotent and simply (re)start playback.
+  @override
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0}) {
     final generation = ++_generation;
     return _enqueue(() async {
@@ -198,7 +212,7 @@ class SonoraAudioHandler extends BaseAudioHandler with SeekHandler {
         tag: item,
         headers: const <String, String>{
           'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
         },
       );
     });

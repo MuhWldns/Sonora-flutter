@@ -122,7 +122,7 @@ class PlayerController extends ChangeNotifier {
     _handler.error.addListener(_onError);
   }
 
-  final SonoraAudioHandler _handler;
+  final SonoraPlaybackHandler _handler;
   final LocalDatabase? database;
 
   StreamSubscription<List<MediaItem>>? _queueSub;

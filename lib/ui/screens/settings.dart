@@ -237,32 +237,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(kRadiusMd),
                           ),
-                          child: SwitchListTile.adaptive(
-                            value: _addonEnabled,
-                            onChanged: _saving ? null : _onToggleAddon,
-                            activeTrackColor: scheme.primary,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: kSpaceMd,
-                              vertical: kSpaceXs,
-                            ),
-                            title: Text(
-                              'Sonora Node Proxy',
-                              style: context.texts.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                          // ListTile melukis latar & ink ripple pada Material
+                          // terdekat; tanpa Material ini, latar Container
+                          // menyembunyikan efeknya (assert debug Flutter).
+                          child: Material(
+                            color: Colors.transparent,
+                            child: SwitchListTile.adaptive(
+                              value: _addonEnabled,
+                              onChanged: _saving ? null : _onToggleAddon,
+                              activeTrackColor: scheme.primary,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: kSpaceMd,
+                                vertical: kSpaceXs,
                               ),
-                            ),
-                            subtitle: Text(
-                              _addonEnabled
-                                  ? (scope.settings.isConfigured
-                                      ? 'Aktif — terhubung ke proxy pribadi'
-                                      : 'Menunggu simpan alamat URL')
-                                  : 'Dinonaktifkan (Mode Mandiri Aktif)',
-                              style: context.texts.bodySmall?.copyWith(
-                                color: _addonEnabled
+                              title: Text(
+                                'Sonora Node Proxy',
+                                style: context.texts.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                _addonEnabled
                                     ? (scope.settings.isConfigured
-                                        ? context.sonora.success
-                                        : scheme.onSurfaceVariant)
-                                    : scheme.onSurfaceVariant,
+                                        ? 'Aktif — terhubung ke proxy pribadi'
+                                        : 'Menunggu simpan alamat URL')
+                                    : 'Dinonaktifkan (Mode Mandiri Aktif)',
+                                style: context.texts.bodySmall?.copyWith(
+                                  color: _addonEnabled
+                                      ? (scope.settings.isConfigured
+                                          ? context.sonora.success
+                                          : scheme.onSurfaceVariant)
+                                      : scheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ),
