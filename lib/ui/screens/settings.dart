@@ -116,9 +116,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (!enabled) {
       final String text = _controller.text.trim();
-      if (text.isNotEmpty) {
-        await scope.settings.setProxyDraft(text);
-      }
       if (scope.settings.isConfigured) {
         await scope.settings.setProxyBase('');
         await scope.player.stop();
@@ -129,6 +126,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             success: true,
           );
         }
+      }
+      if (text.isNotEmpty) {
+        await scope.settings.setProxyDraft(text);
       }
     } else {
       if (_controller.text.trim().isEmpty &&
@@ -608,8 +608,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+        _autoplayCard(context, scope),
         const SizedBox(height: kSpaceMd),
         _equalizerCard(context, scope),
+      ],
+    );
+  }
+
+  Widget _autoplayCard(BuildContext context, SonoraScope scope) {
+    final SettingsStore settings = scope.settings;
+    final ColorScheme scheme = context.scheme;
+    return _settingsCard(
+      context,
+      icon: Icons.auto_awesome_rounded,
+      title: 'Putar otomatis',
+      subtitle:
+          'Setelah lagu terakhir, saran radio YouTube otomatis mengisi antrean.',
+      children: <Widget>[
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(kRadiusMd),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: SwitchListTile.adaptive(
+              value: settings.autoplayEnabled,
+              onChanged: (bool value) {
+                _applySetting(() => settings.setAutoplayEnabled(value));
+              },
+              activeTrackColor: scheme.primary,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: kSpaceMd,
+                vertical: kSpaceXs,
+              ),
+              title: Text(
+                'Aktifkan putar otomatis',
+                style: context.texts.titleSmall,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

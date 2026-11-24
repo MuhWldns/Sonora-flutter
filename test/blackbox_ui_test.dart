@@ -10,6 +10,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -50,6 +52,9 @@ class FakeSonoraAudioHandler extends BaseAudioHandler
 
   @override
   AndroidEqualizer? get equalizer => null;
+
+  @override
+  Future<void> appendSuggestions(List<MusicItem> items) async {}
 
   @override
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0}) async {
@@ -196,6 +201,11 @@ class FakeLocalDatabase extends Fake implements LocalDatabase {
 
   @override
   Future<List<MusicItem>> getRecentPlaybacks({int limit = 100}) async {
+    return List<MusicItem>.unmodifiable(recentPlaybacks.take(limit));
+  }
+
+  @override
+  Future<List<MusicItem>> getPlaybacksSince(int timestamp, {int limit = 100}) async {
     return List<MusicItem>.unmodifiable(recentPlaybacks.take(limit));
   }
 
@@ -436,8 +446,21 @@ const MusicItem kTestSong2 = MusicItem(
   duration: '4:20',
 );
 
+class FakePathProviderPlatform extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  @override
+  Future<String?> getTemporaryPath() async => Directory.systemTemp.path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => Directory.systemTemp.path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => Directory.systemTemp.path;
+}
+
 void main() {
   setUpAll(() {
+    PathProviderPlatform.instance = FakePathProviderPlatform();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
@@ -456,7 +479,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Aktifkan sakelar Add-on
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sonora Node Proxy'));
       await tester.pumpAndSettle();
 
       // Masukkan URL sah
@@ -480,7 +503,7 @@ void main() {
       await tester.pumpWidget(harness.buildApp(const SettingsScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sonora Node Proxy'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'ftp://myhost:8787');
@@ -503,7 +526,7 @@ void main() {
       await tester.pumpWidget(harness.buildApp(const SettingsScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sonora Node Proxy'));
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -549,7 +572,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Matikan sakelar Add-on
-      await tester.tap(find.byType(Switch));
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sonora Node Proxy'));
       await tester.pumpAndSettle();
 
       expect(harness.settings.proxyBase, isEmpty);
@@ -557,7 +580,7 @@ void main() {
       expect(find.byType(TextField), findsNothing);
 
       // Aktifkan kembali sakelar Add-on
-      await tester.tap(find.byType(Switch));
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sonora Node Proxy'));
       await tester.pumpAndSettle();
 
       expect(find.byType(TextField), findsOneWidget);
@@ -570,16 +593,23 @@ void main() {
     testWidgets('TC-SET-06: Pembersihan cache audio manual via tombol Bersihkan', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       final TestHarness harness = await TestHarness.create();
       addTearDown(harness.dispose);
 
       await tester.pumpWidget(harness.buildApp(const SettingsScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Bersihkan'));
+      final Finder btn = find.widgetWithText(OutlinedButton, 'Bersihkan');
+      await tester.tap(btn);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.pumpAndSettle();
 
       expect(
         find.text('Cache audio berhasil dibersihkan.'),
@@ -893,7 +923,8 @@ void main() {
       expect(playAllBtn, findsOneWidget);
 
       await tester.tap(playAllBtn);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(harness.player.snapshot.queue, hasLength(2));
       expect(harness.player.snapshot.queue.first.videoId, kTestSong1.videoId);

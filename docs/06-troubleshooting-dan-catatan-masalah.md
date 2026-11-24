@@ -9,6 +9,7 @@ Dokumen ini mencatat masalah nyata yang pernah terjadi pada Sonora Flutter, akar
 | **M-01** | Pemutaran gagal: `HttpDataSource$InvalidResponseCodeException: Response code: 403` | data / playback | CDN GoogleVideo menolak unduhan penuh untuk sebagian URL format audio-only | Validasi kandidat URL sebelum dipakai + fallback bertingkat AAC → Opus → muxed |
 | **M-02** | Pencarian gagal: `FormatException: Invalid radix-10 number (at character 1)` (sumber `Streamed`) dan/atau `NoSuchMethodError: ... getT` | data | Kerentanan parser pencarian pada pustaka `youtube_explode_dart` | Pencarian memakai innertube API langsung dengan parsing defensif |
 | **M-03** | Debug assert: `ListTile background color or ink splashes may be invisible` | ui | `ListTile` tidak memiliki ancestor `Material` | Bungkus tile dengan `Material(color: Colors.transparent)` |
+| **M-04** | Sakelar Add-on proxy bangkit kembali saat dimatikan (*toggle race condition*) | ui / data | `setProxyDraft` memicu listener `SettingsStore` sebelum `setProxyBase('')` selesai dieksekusi | Bersihkan `proxyBase` terlebih dahulu sebelum menyimpan draf, dan sinkronkan `_addonEnabled = current.isNotEmpty` |
 
 ---
 
@@ -106,11 +107,35 @@ Bungkus tile dengan `Material(color: Colors.transparent)`:
 
 ---
 
+## M-04 — Sakelar Add-on proxy bangkit kembali saat dimatikan (Toggle Race Condition)
+
+### Gejala
+
+Ketika pengguna mematikan sakelar toggle *Sonora Node Proxy* di layar Pengaturan, `proxyBase` berhasil dikosongkan tetapi form input alamat URL tetap tampil (*expanded*) seolah-olah sakelar masih aktif.
+
+### Akar Penyebab
+
+Pada `_onToggleAddon(false)` di `lib/ui/screens/settings.dart`:
+1. `scope.settings.setProxyDraft(text)` dipanggil terlebih dahulu.
+2. `setProxyDraft` memanggil `notifyListeners()`.
+3. Listener `_onSettingsChanged` pada state `SettingsScreen` langsung terpicu. Pada saat ini, `scope.settings.proxyBase` belum sempat dikosongkan (`current.isNotEmpty` bernilai `true`), sehingga kode listener secara keliru menetapkan kembali `_addonEnabled = true`.
+4. Baru kemudian `scope.settings.setProxyBase('')` dieksekusi. Namun karena state `_addonEnabled` sudah terlanjur dipaksa `true`, UI tidak menciutkan form input.
+
+### Solusi
+
+1. **Membalik urutan eksekusi**: Kosongkan `proxyBase` dan hentikan pemutar audio terlebih dahulu sebelum menyimpan draf URL.
+2. **Sinkronisasi dua arah**: Pada `_onSettingsChanged()`, tetapkan `_addonEnabled = current.isNotEmpty` agar selalu selaras dengan keberadaan endpoint yang aktif.
+
+---
+
 ## Catatan Dependensi
 
 `pubspec.yaml` memakai `dependency_overrides` untuk `youtube_explode_dart` menuju commit master upstream (`44a39a65…`). Alasannya: versi pub 3.1.0 menghasilkan URL stream yang ditolak CDN saat diputar, sedangkan client default pada master menghasilkan URL yang dapat diputar. Override ini disengaja — **jangan dihapus** sebelum versi pub memuat perbaikan client stream.
 
 ## Catatan Pengujian
 
-- Suite hermetik: `test/data_test.dart` + `test/database_test.dart` (35 test) — tanpa jaringan, aman dijalankan kapan pun.
-- `test/blackbox_ui_test.dart` menjalankan pengujian terhadap jaringan nyata (±1 menit per kasus) — jalankan secara selektif, jangan masukkan ke rutinitas `flutter test` penuh.
+Seluruh suite pengujian otomatis Sonora Flutter kini bersifat **hermetis murni (in-memory test doubles)** dan dapat dijalankan sekaligus dengan `flutter test` tanpa ketergantungan jaringan atau proses native eksternal:
+- `test/data_test.dart` (30 test): Validasi kontrak model, parsing API, dan manajemen cache.
+- `test/database_test.dart` (5 test): Validasi integritas persistensi SQLite (`sqflite_common_ffi`).
+- `test/blackbox_ui_test.dart` (23 test): Validasi kotak hitam UI antarmuka (`WidgetTester`) mencakup seluruh modul `TC-SET`, `TC-PLY`, `TC-SRC`, `TC-LIB`, `TC-LYR`, dan `TC-BRW`.
+- Total: **58 pengujian otomatis (100% Pass dalam ~8 detik)**. Bebas dari kebocoran DLL Windows (`sqlite3.dll access denied`) maupun hang platform channel.

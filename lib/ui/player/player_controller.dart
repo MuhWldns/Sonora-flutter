@@ -19,7 +19,16 @@ import 'package:flutter/foundation.dart';
 
 import '../../data/local_database.dart';
 import '../../data/music_models.dart';
+import '../../data/settings_store.dart';
 import '../../playback/sonora_audio_handler.dart';
+
+/// Mengambil saran lagu terkait untuk satu video (radio/AutoPlay).
+typedef RadioFetcher =
+    Future<List<MusicItem>> Function(
+      String videoId, {
+      int limit,
+      Set<String> exclude,
+    });
 
 /// Satu lagu di antrean UI.
 @immutable
@@ -115,7 +124,7 @@ class PlayerSnapshot {
 
 /// Pengendali pemutar yang dapat diamati.
 class PlayerController extends ChangeNotifier {
-  PlayerController(this._handler, {this.database}) {
+  PlayerController(this._handler, {this.database, this.settings, this.radioFetcher}) {
     _queueSub = _handler.queue.listen(_onQueue);
     _mediaItemSub = _handler.mediaItem.listen(_onMediaItem);
     _stateSub = _handler.playbackState.listen(_onPlaybackState);
@@ -125,6 +134,10 @@ class PlayerController extends ChangeNotifier {
 
   final SonoraPlaybackHandler _handler;
   final LocalDatabase? database;
+  final SettingsStore? settings;
+
+  /// Pengambil saran radio untuk AutoPlay; `null` berarti dinonaktifkan.
+  final RadioFetcher? radioFetcher;
 
   StreamSubscription<List<MediaItem>>? _queueSub;
   StreamSubscription<MediaItem?>? _mediaItemSub;
@@ -159,6 +172,11 @@ class PlayerController extends ChangeNotifier {
   /// Generasi antrean: menaik saat antrean diganti/dihentikan sehingga operasi
   /// lama tidak menimpa keadaan terbaru.
   int _generation = 0;
+
+  /// AutoPlay: penanda sedang mengambil saran dan seed terakhir yang dicoba
+  /// agar satu lagu tidak memicu pengambilan radio berulang kali.
+  bool _autoplayBusy = false;
+  String? _autoplaySeed;
 
   // ---------------------------------------------------------------------------
   // Publik
@@ -224,6 +242,40 @@ class PlayerController extends ChangeNotifier {
       await _handler.skipToQueueItem(index);
     } catch (error) {
       _setError(_message(error));
+    }
+  }
+
+  /// AutoPlay: bila lagu aktif adalah lagu terakhir antrean,
+  /// ambil saran radio YouTube dan tambahkan ke ekor antrean tanpa memutus
+  /// pemutaran. Tidak berjalan saat mode ulangi-semua (antrean berputar sendiri).
+  Future<void> _maybeAutoplay() async {
+    final RadioFetcher? fetcher = radioFetcher;
+    if (fetcher == null || _disposed) return;
+    if (settings != null && !settings!.autoplayEnabled) return;
+    if (_repeat == PlayerRepeatMode.all) return;
+    final List<PlayerTrack> queue = _snapshot.queue;
+    final int index = _snapshot.index;
+    if (queue.isEmpty || index < 0 || index != queue.length - 1) return;
+    final String seed = queue[index].videoId;
+    if (seed.isEmpty || _autoplayBusy || seed == _autoplaySeed) return;
+    _autoplayBusy = true;
+    _autoplaySeed = seed;
+    try {
+      final Set<String> exclude = <String>{
+        for (final PlayerTrack track in queue)
+          if (track.videoId.isNotEmpty) track.videoId,
+      };
+      final List<MusicItem> suggestions = await fetcher(
+        seed,
+        limit: 10,
+        exclude: exclude,
+      );
+      if (_disposed || suggestions.isEmpty) return;
+      await _handler.appendSuggestions(suggestions);
+    } catch (_) {
+      // Radio bersifat opsional; kegagalan tidak boleh mengganggu pemutaran.
+    } finally {
+      _autoplayBusy = false;
     }
   }
 
@@ -408,6 +460,7 @@ class PlayerController extends ChangeNotifier {
     if (_disposed) return;
     _nativeQueue = items;
     _publish(_compose());
+    unawaited(_maybeAutoplay());
   }
 
   void _onMediaItem(MediaItem? item) {
@@ -430,6 +483,7 @@ class PlayerController extends ChangeNotifier {
     _current = item;
     _duration = item?.duration ?? Duration.zero;
     _publish(_compose());
+    unawaited(_maybeAutoplay());
   }
 
   void _onPlaybackState(PlaybackState state) {

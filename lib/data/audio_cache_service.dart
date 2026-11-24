@@ -25,12 +25,12 @@ class AudioCacheService {
   static Future<int> getCacheSizeBytes() async {
     try {
       final Directory dir = await getCacheDirectory();
-      if (!await dir.exists()) return 0;
+      if (!dir.existsSync()) return 0;
       int total = 0;
-      await for (final FileSystemEntity entity
-          in dir.list(recursive: true, followLinks: false)) {
+      for (final FileSystemEntity entity
+          in dir.listSync(recursive: true, followLinks: false)) {
         if (entity is File) {
-          total += await entity.length();
+          total += entity.lengthSync();
         }
       }
       return total;
@@ -97,14 +97,14 @@ class AudioCacheService {
   static Future<void> clearCache() async {
     try {
       final Directory dir = await getCacheDirectory();
-      if (!await dir.exists()) return;
-      await for (final FileSystemEntity entity
-          in dir.list(recursive: false, followLinks: false)) {
+      if (!dir.existsSync()) return;
+      for (final FileSystemEntity entity
+          in dir.listSync(recursive: false, followLinks: false)) {
         try {
           if (entity is File) {
-            await entity.delete();
+            entity.deleteSync();
           } else if (entity is Directory) {
-            await entity.delete(recursive: true);
+            entity.deleteSync(recursive: true);
           }
         } catch (_) {
           // File mungkin sedang dikunci pemutar aktif; lewati berkas terkunci.

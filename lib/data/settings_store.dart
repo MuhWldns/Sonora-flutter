@@ -35,6 +35,7 @@ class SettingsStore extends ChangeNotifier {
   static const String _cacheLimitKey = 'sonora.cacheLimitMb';
   static const String _equalizerEnabledKey = 'sonora.equalizerEnabled';
   static const String _equalizerBandsKey = 'sonora.equalizerBands';
+  static const String _autoplayKey = 'sonora.autoplay';
 
   /// Default opsional dari build (`--dart-define=SONORA_PROXY_URL=...`).
   static const String _environmentDefault =
@@ -48,6 +49,7 @@ class SettingsStore extends ChangeNotifier {
   int _cacheLimitMb = 500;
   bool _equalizerEnabled = false;
   List<int> _equalizerBands = const <int>[0, 0, 0, 0, 0];
+  bool _autoplay = true;
 
   /// Base URL proxy aktif (tanpa slash ujung). Bisa kosong.
   String get proxyBase => _proxyBase;
@@ -90,7 +92,8 @@ class SettingsStore extends ChangeNotifier {
       .._themeMode = _parseThemeMode(prefs.get(_themeModeKey))
       .._cacheLimitMb = _parseCacheLimitMb(prefs.get(_cacheLimitKey))
       .._equalizerEnabled = prefs.getBool(_equalizerEnabledKey) ?? false
-      .._equalizerBands = _parseEqualizerBands(prefs.get(_equalizerBandsKey));
+      .._equalizerBands = _parseEqualizerBands(prefs.get(_equalizerBandsKey))
+      .._autoplay = prefs.getBool(_autoplayKey) ?? true;
     return store;
   }
 
@@ -190,6 +193,21 @@ class SettingsStore extends ChangeNotifier {
       );
     }
     _equalizerEnabled = value;
+    notifyListeners();
+  }
+
+  /// `true` bila saran radio otomatis mengisi antrean (AutoPlay).
+  bool get autoplayEnabled => _autoplay;
+
+  Future<void> setAutoplayEnabled(bool value) async {
+    if (value == _autoplay) return;
+    final saved = await _preferences.setBool(_autoplayKey, value);
+    if (!saved) {
+      throw const SettingsPersistenceException(
+        'Gagal menyimpan status putar otomatis. Perubahan tidak diterapkan.',
+      );
+    }
+    _autoplay = value;
     notifyListeners();
   }
 

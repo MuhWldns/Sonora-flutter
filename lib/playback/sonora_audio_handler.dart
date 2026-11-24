@@ -38,6 +38,7 @@ abstract interface class SonoraPlaybackHandler implements AudioHandler {
   /// platform does not support it.
   AndroidEqualizer? get equalizer;
   Future<void> playItems(List<MusicItem> items, {int startIndex = 0});
+  Future<void> appendSuggestions(List<MusicItem> items);
 }
 
 class SonoraAudioHandler extends BaseAudioHandler
@@ -272,14 +273,7 @@ class SonoraAudioHandler extends BaseAudioHandler
       if (uri == null) {
         throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
       }
-      return AudioSource.uri(
-        uri,
-        tag: item,
-        headers: const <String, String>{
-          'User-Agent':
-              'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
-        },
-      );
+      return _audioSourceFor(item, uri);
     });
 
     final sources = await Future.wait(futures);
@@ -310,6 +304,40 @@ class SonoraAudioHandler extends BaseAudioHandler
       unawaited(AudioCacheService.pruneCache(maxBytes: limitMb * 1024 * 1024));
     }
     return true;
+  }
+
+  /// Membangun sumber audio untuk satu lagu dengan header seperti klien YouTube.
+  AudioSource _audioSourceFor(MusicItem item, Uri uri) => AudioSource.uri(
+    uri,
+    tag: item,
+    headers: const <String, String>{
+      'User-Agent':
+          'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
+    },
+  );
+
+  /// Menambahkan saran radio ke ekor antrean tanpa memutus lagu yang sedang
+  /// diputar (AutoPlay). Lagu yang gagal diselesaikan URI-nya dilewati.
+  @override
+  Future<void> appendSuggestions(List<MusicItem> items) async {
+    final List<AudioSource> sources = <AudioSource>[];
+    for (final MusicItem item in items) {
+      final String? videoId = item.videoId;
+      if (videoId == null || videoId.isEmpty) continue;
+      try {
+        final Uri? uri = await _yt.resolveStreamUri(
+          videoId,
+          quality: settings?.audioQuality ?? AudioQuality.auto,
+        );
+        if (uri == null) continue;
+        sources.add(_audioSourceFor(item, uri));
+      } catch (_) {
+        // Lewati saran yang tidak dapat diselesaikan.
+      }
+    }
+    if (sources.isEmpty) return;
+    await _player.addAudioSources(sources);
+    _publishQueue();
   }
 
   /// Starts playback without awaiting its lifetime.

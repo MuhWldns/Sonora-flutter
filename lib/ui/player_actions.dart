@@ -32,6 +32,17 @@ class PlayerActions {
   void playQueue(List<MusicItem> items, {int startIndex = 0}) =>
       unawaited(_player.playQueue(items, startIndex: startIndex));
 
+  /// Memutar daftar mulai [index] sehingga antrean langsung berisi lagu-lagu
+  /// berikutnya. Item koleksi (playlist/album) tetap dibuka di halaman Browse.
+  void playFrom(List<MusicItem> items, int index) {
+    if (index < 0 || index >= items.length) return;
+    final MusicItem item = items[index];
+    if (browseTargetOf(item) != null) {
+      open(item);
+      return;
+    }
+    playQueue(items, startIndex: index);
+  }
   void addToQueue(MusicItem item, {bool next = false}) =>
       unawaited(_player.addItem(item, next: next));
 

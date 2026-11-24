@@ -90,10 +90,34 @@ Dokumen ini memuat laporan dan matriks pengujian fungsional perangkat lunak meng
 
 ---
 
-## 3. Kesimpulan Hasil Pengujian
+## 3. Hasil Pengujian Otomatis & Verifikasi E2E
 
-Berdasarkan eksekusi seluruh skenario pengujian kotak hitam pada 6 modul fungsional di atas:
-* **Total Kasus Uji**: 30 Kasus Uji.
+Selain pengujian fungsional manual pada perangkat Android fisik/emulator, seluruh matriks kasus uji di atas telah diotomatisasi ke dalam suite pengujian regresi Dart/Flutter hermetis:
+
+### 3.1. Ringkasan Eksekusi Suite Pengujian Otomatis (`flutter test`)
+
+| Berkas Pengujian | Cakupan & Fokus Pengujian | Jumlah Test | Hasil | Waktu Eksekusi |
+| :--- | :--- | :---: | :---: | :---: |
+| **`test/blackbox_ui_test.dart`** | Pengujian kotak hitam antarmuka pengguna (`WidgetTester`) mencakup seluruh 6 modul: `TC-SET`, `TC-PLY`, `TC-SRC`, `TC-LIB`, `TC-LYR`, dan `TC-BRW` dengan *in-memory test doubles* murni. | **23** | **23 Pass (100%)** | ~5 detik |
+| **`test/data_test.dart`** | Pengujian kontrak boundary lapisan data: serialisasi model, normalisasi `SettingsStore` (audio quality, equalizer, theme mode, cache limit), ketahanan `SonoraApi`, dan manipulasi direktori cache disk. | **34** | **34 Pass (100%)** | ~2 detik |
+| **`test/database_test.dart`** | Pengujian integritas basis data SQLite nyata (`databaseFactoryFfi`): *playback history limit 100*, relasi playlist, favorit, dan filter *skip 15 detik*. | **5** | **5 Pass (100%)** | ~1 detik |
+| **Total Keseluruhan** | **Suite Otomatis Sonora Flutter** | **62** | **62 Pass (100%)** | **~8 detik** |
+
+### 3.2. Verifikasi Transmisi Aliran Audio Langsung (*E2E CDN Audio Streaming*)
+
+Pengujian transmisi aliran audio end-to-end langsung ke CDN YouTube GoogleVideo membuktikan bahwa aplikasi dapat mengalirkan suara nyata tanpa pemblokiran:
+* **Query Pencarian**: Pencarian kata kunci live/umum (`"Top Music Hits 2026"`) berhasil mengembalikan 20 hasil tanpa memicu `FormatException` ("Streamed 2 days ago").
+* **Resolusi Stream Audio**: Format AAC itag 140 (133.5 kbps) berhasil diperoleh secara konsisten melalui profil `YoutubeApiClient.androidSdkless`.
+* **Uji Permintaan Parsial (`Range: bytes=0-1024`)**: Menggunakan User-Agent klien Android YouTube resmi (`com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip`), server GoogleVideo CDN mengembalikan **HTTP Status 206 (Partial Content)** dengan payload header `Content-Type: audio/mp4`. Tidak terjadi error `HTTP 403 Forbidden` pada ExoPlayer Media3 Android.
+
+---
+
+## 4. Kesimpulan Hasil Pengujian
+
+Berdasarkan eksekusi seluruh skenario pengujian kotak hitam manual dan otomasi pengujian pada 6 modul fungsional:
+* **Total Kasus Uji Fungsional**: 30 Kasus Uji.
 * **Jumlah Berhasil (Pass)**: 30 Kasus Uji (100%).
 * **Jumlah Gagal (Fail)**: 0 Kasus Uji (0%).
-* **Kesimpulan Akhir**: Seluruh fitur utama aplikasi—mulai dari pemutaran audio mandiri, manajemen cache otomatis, pencarian reaktif, lirik sinkron, hingga persistensi offline—memenuhi spesifikasi fungsional dan siap digunakan untuk evaluasi makalah perangkat lunak.
+* **Suite Otomasi Regresi**: 62 / 62 Pengujian Lulus (100% Pass, 0 Failure).
+* **Kualitas Kode Statis**: `flutter analyze` menghasilkan 0 masalah (*0 issues*).
+* **Kesimpulan Akhir**: Seluruh fitur utama aplikasi—mulai dari pemutaran audio mandiri bebas 403, manajemen cache otomatis, pencarian reaktif aman live stream, lirik sinkron, hingga persistensi offline SQLite—memenuhi spesifikasi fungsional dan siap digunakan untuk evaluasi makalah perangkat lunak.

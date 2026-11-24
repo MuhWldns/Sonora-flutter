@@ -319,20 +319,7 @@ class YouTubeMusicService {
       final Stream<Video> videoStream = _yt.playlists.getVideos(cleanId);
       final List<MusicItem> items = <MusicItem>[];
       await for (final Video video in videoStream.take(limit)) {
-        final String thumbnail = video.thumbnails.highResUrl.isNotEmpty
-            ? video.thumbnails.highResUrl
-            : video.thumbnails.standardResUrl;
-        items.add(
-          MusicItem(
-            type: 'song',
-            title: video.title,
-            artist: video.author,
-            subtitle: video.author,
-            thumbnail: thumbnail,
-            videoId: video.id.value,
-            duration: _formatDuration(video.duration),
-          ),
-        );
+        items.add(_videoToItem(video));
       }
       if (items.isNotEmpty) {
         return <MusicSection>[
@@ -361,6 +348,50 @@ class YouTubeMusicService {
     }
 
     return const <MusicSection>[];
+  }
+
+  /// Mengambil saran lagu terkait (radio YouTube) untuk satu video agar
+  /// antrean selalu berisi lagu berikutnya secara otomatis.
+  ///
+  /// Kegagalan jaringan atau video tanpa saran mengembalikan daftar kosong —
+  /// sifat radio bersifat opsional dan tidak boleh mengganggu pemutaran.
+  Future<List<MusicItem>> fetchRadio(
+    String videoId, {
+    int limit = 10,
+    Set<String> exclude = const <String>{},
+  }) async {
+    if (_disposed || videoId.trim().isEmpty) return const <MusicItem>[];
+    try {
+      final Video seed = await _yt.videos.get(videoId.trim());
+      final RelatedVideosList? related = await _yt.videos.getRelatedVideos(seed);
+      if (related == null) return const <MusicItem>[];
+      final List<MusicItem> items = <MusicItem>[];
+      for (final Video video in related) {
+        if (items.length >= limit) break;
+        final MusicItem item = _videoToItem(video);
+        if (!item.isPlayable || exclude.contains(item.videoId)) continue;
+        items.add(item);
+      }
+      return items;
+    } catch (_) {
+      return const <MusicItem>[];
+    }
+  }
+
+  /// Memetakan satu video YouTube menjadi item musik yang dapat diputar.
+  MusicItem _videoToItem(Video video) {
+    final String thumbnail = video.thumbnails.highResUrl.isNotEmpty
+        ? video.thumbnails.highResUrl
+        : video.thumbnails.standardResUrl;
+    return MusicItem(
+      type: 'song',
+      title: video.title,
+      artist: video.author,
+      subtitle: video.author,
+      thumbnail: thumbnail,
+      videoId: video.id.value,
+      duration: _formatDuration(video.duration),
+    );
   }
 
   static String? _formatDuration(Duration? duration) {

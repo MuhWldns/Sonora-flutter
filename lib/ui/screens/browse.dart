@@ -194,7 +194,7 @@ class _BrowseBody extends StatelessWidget {
                     item: item,
                     trackNumber: (startNumber + i).toString().padLeft(2, '0'),
                     active: actions.activeVideoId == item.videoId,
-                    onPlay: () => actions.play(item),
+                    onPlay: () => actions.playFrom(section.items, i),
                     onAddToQueue: (bool next) => actions.addToQueue(item, next: next),
                   ),
               ],
@@ -204,7 +204,10 @@ class _BrowseBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               if (section.title.isNotEmpty) SectionHeader(title: section.title),
-              MusicShelf(items: section.items, onOpen: actions.open),
+              MusicShelf(
+                items: section.items,
+                onOpen: actions.open,
+              ),
             ],
           );
         },

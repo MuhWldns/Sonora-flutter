@@ -39,8 +39,12 @@ class SonoraApp extends StatefulWidget {
 }
 
 class _SonoraAppState extends State<SonoraApp> {
-  late final PlayerController _player =
-      PlayerController(widget.audio, database: widget.database);
+  late final PlayerController _player = PlayerController(
+    widget.audio,
+    database: widget.database,
+    settings: widget.settings,
+    radioFetcher: widget.ytService.fetchRadio,
+  );
   late final AppTabController _tabs = AppTabController();
 
   @override
