@@ -397,9 +397,7 @@ class SonoraAudioHandler extends BaseAudioHandler
       if (_disposed) return;
       final int count = _player.sequence.length;
       if (from < 0 || from >= count || count < 2) return;
-      int target = to;
-      if (target > from) target -= 1; // Konvensi indeks ReorderableListView.
-      target = target.clamp(0, count - 1);
+      final int target = to.clamp(0, count - 1);
       if (target == from) return;
       final AudioSource source = _player.sequence[from];
       try {

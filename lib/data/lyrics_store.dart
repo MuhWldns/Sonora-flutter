@@ -58,7 +58,7 @@ class LyricsRepository {
 
   static const String _userAgent =
       'Sonora Flutter/1.0 (https://github.com/MuhWldns/Sonora-flutter)';
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 7);
 
   /// Menutup klien HTTP bila dimiliki sendiri.
   void dispose() {

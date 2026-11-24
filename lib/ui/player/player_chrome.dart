@@ -736,9 +736,10 @@ class _LyricsViewState extends State<_LyricsView> {
     if (mounted) setState(() => _phase = _LyricsPhase.loading);
     _repo ??= LyricsRepository();
     final api = SonoraScope.of(context).api;
+    final (String trackName, String artistName) = _lyricsQueryNames();
     final LrcLyrics? lyrics = await _repo!.find(
-      track: widget.track.title,
-      artist: widget.track.artist,
+      track: trackName,
+      artist: artistName,
       videoId: widget.track.videoId,
       durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
       proxyLyrics: api.lyrics,
@@ -754,6 +755,44 @@ class _LyricsViewState extends State<_LyricsView> {
         _lyrics = lyrics;
       }
     });
+  }
+
+  /// Menyusun nama lagu/artis yang bersih dari metadata YouTube agar
+  /// pencocokan LRCLIB lebih akurat — judul video biasanya berbentuk
+  /// "Artis - Judul (Official Video)" sementara nama kanal sering generik.
+  (String, String) _lyricsQueryNames() {
+    String stripNoise(String input) {
+      var text = input.trim();
+      text = text.replaceAll(
+        RegExp(
+          r'\s*[\(\[][^)\]]*(official|lyric|audio|video|mv|visualizer|hd|4k)[^)\]]*[\)\]]',
+          caseSensitive: false,
+        ),
+        '',
+      );
+      return text.trim();
+    }
+
+    final String rawTitle = stripNoise(widget.track.title);
+    var artist = stripNoise(widget.track.artist);
+    artist = artist
+        .replaceAll(RegExp(r'\s*-\s*topic\s*$', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s*vevo\s*$', caseSensitive: false), '')
+        .trim();
+    var title = rawTitle;
+    final RegExpMatch? dash =
+        RegExp(r'^(.{1,60}?)\s+[-–—]\s+(.+)$').firstMatch(rawTitle);
+    if (dash != null) {
+      final String left = dash.group(1)!.trim();
+      final String right = dash.group(2)!.trim();
+      if (left.isNotEmpty && right.isNotEmpty && left.length <= 40) {
+        // Pola "Artis - Judul": sisi kiri jauh lebih layak dipakai sebagai
+        // artis dibanding nama kanal YouTube.
+        artist = left;
+        title = right;
+      }
+    }
+    return (title, artist);
   }
 
   void _scheduleAutoScroll(int? active) {
@@ -867,10 +906,10 @@ class _LyricsViewState extends State<_LyricsView> {
                 color: context.scheme.onSurfaceVariant,
               ),
               const SizedBox(height: kSpaceMd),
-              Text('Lirik tidak tersedia', style: context.texts.titleMedium),
+              Text('Lirik tidak ditemukan', style: context.texts.titleMedium),
               const SizedBox(height: kSpaceXs),
               Text(
-                'LRCLIB tidak memiliki lirik untuk lagu ini.',
+                'LRCLIB tidak punya lirik untuk lagu ini.',
                 style: context.texts.bodySmall
                     ?.copyWith(color: context.scheme.onSurfaceVariant),
               ),
@@ -1078,6 +1117,12 @@ class QueueView extends StatelessWidget {
       );
     }
     final int currentIndex = snap.index;
+    // Daftar indeks antrean tanpa lagu yang sedang diputar — lagu aktif
+    // sudah tampil di kartu "Sedang diputar" di atas.
+    final List<int> upcoming = <int>[
+      for (var i = 0; i < snap.queue.length; i++)
+        if (i != currentIndex) i,
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -1152,82 +1197,108 @@ class QueueView extends StatelessWidget {
           child: Overline('Berikutnya'),
         ),
         Expanded(
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.only(bottom: kSpaceXl),
-            buildDefaultDragHandles: false,
-            itemCount: snap.queue.length,
-            onReorderItem: (int oldIndex, int newIndex) =>
-                player.moveItem(oldIndex, newIndex),
-            itemBuilder: (BuildContext context, int index) {
-              final PlayerTrack track = snap.queue[index];
-              final bool active = index == currentIndex;
-              return Dismissible(
-                key: ValueKey<String>('${track.videoId}-$index'),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
-                  color: scheme.errorContainer,
-                  child:
-                      Icon(Icons.delete_outline_rounded, color: scheme.onErrorContainer),
-                ),
-                onDismissed: (_) => player.removeAt(index),
-                child: InkWell(
-                  onTap: () => player.playAt(index),
-                  child: SizedBox(
-                    height: 56,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: kSpaceLg),
-                      child: Row(
-                        children: <Widget>[
-                          CoverArt(url: track.thumbnail, size: 40),
-                          const SizedBox(width: kSpaceMd),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+          child: upcoming.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    kSpaceLg,
+                    kSpaceMd,
+                    kSpaceLg,
+                    0,
+                  ),
+                  child: Text(
+                    'Belum ada lagu berikutnya. AutoPlay akan mengisi antrean.',
+                    style: context.texts.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.only(bottom: kSpaceXl),
+                  buildDefaultDragHandles: false,
+                  itemCount: upcoming.length,
+                  onReorderItem: (int oldIndex, int newIndex) {
+                    // onReorderItem sudah menyesuaikan newIndex untuk item
+                    // yang digeser; petakan ke indeks antrean asli.
+                    final int target = newIndex.clamp(0, upcoming.length - 1);
+                    final int from = upcoming[oldIndex];
+                    final int to = target < currentIndex ? target : target + 1;
+                    player.moveItem(from, to);
+                  },
+                  itemBuilder: (BuildContext context, int index) {
+                    final int nativeIndex = upcoming[index];
+                    final PlayerTrack track = snap.queue[nativeIndex];
+                    return Dismissible(
+                      key: ValueKey<String>('$nativeIndex-${track.videoId}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: kSpaceXl),
+                        color: scheme.errorContainer,
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          color: scheme.onErrorContainer,
+                        ),
+                      ),
+                      onDismissed: (_) => player.removeAt(nativeIndex),
+                      child: InkWell(
+                        onTap: () => player.playAt(nativeIndex),
+                        child: SizedBox(
+                          height: 56,
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: kSpaceLg),
+                            child: Row(
                               children: <Widget>[
-                                Text(
-                                  track.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.texts.bodyLarge?.copyWith(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: active
-                                        ? sonora.accentText
-                                        : scheme.onSurface,
+                                CoverArt(url: track.thumbnail, size: 40),
+                                const SizedBox(width: kSpaceMd),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      Text(
+                                        track.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: context.texts.bodyLarge
+                                            ?.copyWith(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: scheme.onSurface,
+                                        ),
+                                      ),
+                                      Text(
+                                        track.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: context.texts.bodySmall
+                                            ?.copyWith(
+                                          fontSize: 11,
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  track.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.texts.bodySmall?.copyWith(
-                                    fontSize: 11,
+                                ReorderableDragStartListener(
+                                  index: index,
+                                  child: Icon(
+                                    Icons.drag_handle_rounded,
+                                    size: 22,
                                     color: scheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: Icon(
-                              Icons.drag_handle_rounded,
-                              size: 22,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
