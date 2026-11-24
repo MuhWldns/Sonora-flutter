@@ -58,6 +58,7 @@ Aplikasi ini berfokus pada pengalaman mendengarkan musik YouTube Music yang bers
   - `saved_collections`: album dan playlist yang disimpan ke koleksi pribadi.
   - `listening_stats`: pencatatan durasi dengar riil untuk statistik musik.
 - **Desain Nocturne Audio** — tema gelap atmosferik dengan aksen crimson tunggal (`#E03A3E`), tipografi Plus Jakarta Sans, dan dukungan tema terang sebagai derivasi.
+- **Login YouTube Music (opsional)** — masuk dengan akun Google lewat WebView untuk membuka profil akun, lagu **Disukai**, dan **Riwayat** pribadi, beranda personal, serta pencarian yang dipersonalisasi. Sesi disimpan terenkripsi di perangkat (`flutter_secure_storage`) dan setiap request innertube ditandatangani `SAPISIDHASH`.
 
 ## Memulai
 
@@ -116,7 +117,7 @@ Pengujian mencakup boundary data, parsing model, direct YouTube streaming servic
 # Analisis statis (harus 0 issues)
 flutter analyze
 
-# Unit test dan regression suite (31 test)
+# Unit test dan regression suite hermetis (99 test, tanpa jaringan)
 flutter test
 ```
 
@@ -132,7 +133,8 @@ lib/
 │   ├── sonora_api.dart           # Klien HTTP untuk proxy Sonora
 │   ├── lyrics_store.dart         # Klien LRCLIB dan parser LRC (lirik tersinkronisasi)
 │   ├── audio_cache_service.dart  # Pengelola disk cache audio & kalkulasi penyimpanan lokal
-│   └── local_database.dart       # SQLite lokal: history, favorites, searches, playlists, collections, stats
+│   ├── youtube_session.dart      # Model sesi YouTube Music, sapisidHash, SessionStore terenkripsi, AccountInfo
+│   ├── youtube_auth_service.dart # Sesi login (capture/restore/signOut) + profil akun sebagai ChangeNotifier
 ├── playback/
 │   └── sonora_audio_handler.dart # AudioHandler, notifikasi native, pemutaran latar belakang
 └── ui/
@@ -142,9 +144,29 @@ lib/
     ├── root_shell.dart           # Navigasi tab utama dan penempatan mini-player
     ├── player_actions.dart       # Fasad aksi pemutar (play, queue, browse)
     ├── player/                   # PlayerController, mini-player, full player, lirik, antrean
-    ├── screens/                  # Layar Beranda, Cari, Browse, dan Pengaturan
+    ├── screens/                  # Layar Beranda, Cari, Browse, Koleksi, Pengaturan, dan Masuk YouTube Music
     └── widgets/                  # Komponen bersama: baris lagu, shelf, skeleton, state UI
 ```
+
+## Login YouTube Music
+
+Fitur opsional untuk masuk ke akun YouTube Music milik pengguna sendiri. Login memakai WebView Google di dalam aplikasi — kata sandi tidak pernah menyentuh kode Sonora.
+
+**Cara pakai:**
+
+1. Buka **Pengaturan → Akun YouTube Music → Masuk**.
+2. Login dengan akun Google di WebView.
+3. Setelah diarahkan ke YouTube Music, tekan tombol **Gunakan Akun** (tombol aktif begitu halaman `music.youtube.com` selesai dimuat).
+
+**Yang terbuka setelah masuk:**
+
+- Kartu profil di Pengaturan: avatar, nama, dan email akun (tombol **Keluar** untuk menghapus sesi).
+- Koleksi **Disukai** dan **Riwayat** pribadi di tab Koleksi.
+- Rak beranda personal (`FEmusic_home`) dan hasil pencarian yang dipersonalisasi; bila gagal, aplikasi otomatis kembali ke mode mandiri.
+
+**Penyimpanan & keamanan sesi:** cookie dan nilai `ytcfg` disimpan sebagai JSON terenkripsi via `flutter_secure_storage` (kunci `sonora.ytmusic_session`) dan dipulihkan saat aplikasi dibuka. Setiap request innertube `music.youtube.com` ditandatangani header `Authorization: SAPISIDHASH`. Diagnostik log hanya mencatat nama/keberadaan cookie — nilai cookie tidak pernah ditulis.
+
+**Dependensi baru:** `flutter_secure_storage ^9.2.4`, `crypto ^3.0.6`, `webview_flutter ^4.13.0`, `webview_cookie_manager_plus ^2.0.18` (fork pengganti `webview_cookie_manager` karena 3.x tidak tersedia di pub).
 
 ## Lisensi
 

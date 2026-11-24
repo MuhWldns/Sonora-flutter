@@ -239,6 +239,8 @@
       <li><a href="#lyrics-store">lyrics_store.dart</a></li>
       <li><a href="#audio-cache-service">audio_cache_service.dart</a></li>
       <li><a href="#local-database">local_database.dart (7 Tabel SQLite)</a></li>
+      <li><a href="#youtube-session">youtube_session.dart (sesi & SAPISIDHASH)</a></li>
+      <li><a href="#youtube-auth-service">youtube_auth_service.dart</a></li>
       <li><a class="section-title">Playback Layer</a></li>
       <li><a href="#audio-handler">sonora_audio_handler.dart</a></li>
       <li><a href="#android-native">Android Native & Service</a></li>
@@ -443,6 +445,33 @@ Future&lt;List&lt;MusicSection&gt;&gt; browse(String browseId, {String? title, S
           <li><strong>Dispose Safety</strong>: Mengimplementasikan <code>dispose()</code> aman untuk membebaskan koneksi HTTP client <code>YoutubeExplode</code>.</li>
         </ul>
       </div>
+
+      <div class="card">
+        <h4>API Sesi & Akun (YouTube Music login):</h4>
+        <pre><code>// Sesi aktif dari provider (dipasang di main.dart → YoutubeAuthService.session)
+set sessionProvider(Future&lt;YoutubeSession?&gt; Function()? provider);
+
+// Validasi sesi berbasis status HTTP (200 = valid), tanpa parsing bentuk respons
+Future&lt;bool&gt; validateSession({YoutubeSession? session});
+
+// Profil akun dari account/account_menu (nama, email, avatar)
+Future&lt;AccountInfo?&gt; fetchAccountInfo({YoutubeSession? session});
+Future&lt;String?&gt; fetchAccountName({YoutubeSession? session});
+
+// Koleksi akun (kosong bila gagal / belum masuk)
+Future&lt;List&lt;MusicItem&gt;&gt; fetchLiked();    // browse FEmusic_liked_videos
+Future&lt;List&lt;MusicItem&gt;&gt; fetchHistory();  // browse FEmusic_history
+Future&lt;List&lt;MusicSection&gt;&gt; fetchHomeSections(); // browse FEmusic_home
+
+// Aksi terotorisasi
+Future&lt;bool&gt; likeVideo(String videoId);   // like/like
+Future&lt;bool&gt; createPlaylist(String title); // playlist/create (PRIVATE)</code></pre>
+        <ul>
+          <li><strong>SAPISIDHASH per request</strong>: Setiap POST ke <code>music.youtube.com/youtubei/v1/</code> ditandatangani <code>Authorization: SAPISIDHASH &lt;ts&gt;_&lt;sha1&gt;</code> dengan header klien WEB_REMIX (client name 67).</li>
+          <li><strong>onBehalfOfUser</strong>: Hanya bagian sebelum <code>||</code> pada <code>DATASYNC_ID</code> yang dikirim (nilai lengkap ditolak HTTP 500).</li>
+          <li><strong>Graceful Degradation</strong>: Tanpa sesi, request tetap anonim dan pencarian jatuh ke jalur <code>www.youtube.com</code>.</li>
+        </ul>
+      </div>
     </section>
 
     <section id="lyrics-store">
@@ -628,6 +657,57 @@ CREATE INDEX idx_listening_logs_artist ON listening_logs(artist);
       <div class="callout info">
         <strong>💡 Tips Pengujian SQLite (In-Memory Database)</strong>
         <p>Di unit test (<code>test/database_test.dart</code>), kita menggunakan paket <code>sqflite_common_ffi</code> dengan database in-memory (<code>inMemoryDatabasePath</code>). Database dibuat di memori RAM dan dibersihkan saat test selesai, sehingga tes berjalan sangat cepat (&lt;1 detik) tanpa mengotori filesystem perangkat.</p>
+      </div>
+    </section>
+
+    <section id="youtube-session">
+      <h2>7b. Data Layer: <code>lib/data/youtube_session.dart</code></h2>
+      <p>Model sesi login YouTube Music hasil tangkapan WebView, penyimpanan terenkripsi, dan helper penandatanganan <code>SAPISIDHASH</code>.</p>
+
+      <div class="card">
+        <h4>Komponen Utama:</h4>
+        <pre><code>// Field sesi: cookie, pageId, dataSyncId, authUser, visitorData, clientVersion
+class YoutubeSession { ... }
+
+// Ambil SAPISID dengan prioritas SAPISID → __Secure-3PAPISID → __Secure-1PAPISID
+static String? sapisidFromCookie(String cookie);
+
+// Rumus hash: sha1("{timestamp} {sapisid} {origin}") heksadesimal huruf kecil
+String sapisidHash(String sapisid, String origin, int timestampSeconds);
+
+// Penyimpanan: FlutterSecureSessionStore (kunci "sonora.ytmusic_session")
+//             InMemorySessionStore (pengujian)
+abstract class SessionStore { ... }
+
+// Profil akun dari account_menu
+class AccountInfo { final String name; final String? email; final String? avatarUrl; }</code></pre>
+        <ul>
+          <li><strong>Terenkripsi</strong>: Sesi disimpan sebagai JSON via <code>flutter_secure_storage</code>.</li>
+          <li><strong>Valid saat restore</strong>: <code>fromJson</code> menolak JSON tak lengkap atau cookie tanpa keluarga SAPISID.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="youtube-auth-service">
+      <h2>7c. Data Layer: <code>lib/data/youtube_auth_service.dart</code></h2>
+      <p><code>ChangeNotifier</code> yang mengelola siklus sesi login dan dipasang di <code>SonoraScope.auth</code> (tidak pernah <code>null</code>).</p>
+
+      <div class="card">
+        <h4>API:</h4>
+        <pre><code>Future&lt;bool&gt; capture({...});  // simpan sesi terenkripsi (tolak tanpa SAPISID / validator gagal)
+Future&lt;void&gt; restore();         // pulihkan sesi saat startup (rusak → dibuang diam-diam)
+Future&lt;void&gt; signOut();         // hapus sesi dari storage &amp; memori
+
+// Getter status
+bool get signedIn;
+YoutubeSession? get session;
+String? get accountName;    // nama / email / avatar dari account_menu
+String? get accountEmail;
+String? get accountAvatarUrl;</code></pre>
+        <ul>
+          <li><strong>Validasi berbasis status</strong>: <code>validate</code> diarahkan ke <code>validateSession</code> (HTTP 200 = valid), bukan parsing nama — perubahan bentuk respons Google tidak menolak sesi valid.</li>
+          <li><strong>Profil pelengkap</strong>: Kegagalan jaringan saat mengisi nama/email/avatar tidak pernah menggagalkan <code>capture</code>/<code>restore</code>.</li>
+        </ul>
       </div>
     </section>
 
