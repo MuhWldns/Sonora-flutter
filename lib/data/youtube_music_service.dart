@@ -365,12 +365,31 @@ class YouTubeMusicService {
   /// hanya pelengkap tampilan; kegagalan membacanya bukan tanda sesi
   /// invalid. Mengembalikan `null` bila gagal atau belum masuk.
   Future<String?> fetchAccountName({YoutubeSession? session}) async {
+    final AccountInfo? info = await fetchAccountInfo(session: session);
+    if (info == null || info.name.isEmpty) return null;
+    return info.name;
+  }
+
+  /// Mengambil informasi profil akun YouTube Music yang sedang masuk.
+  ///
+  /// Memakai respons `account_menu` yang sama dengan [fetchAccountName]:
+  /// nama dari logika penelusuran yang sama, email dari
+  /// `accountItemRenderer.email`, dan avatar dari thumbnail foto akun
+  /// (thumbnail terbesar yang dipilih). Field yang tidak ditemukan
+  /// bernilai `null`; metode ini tidak pernah melempar exception dan
+  /// mengembalikan `null` bila request gagal atau status bukan 200.
+  Future<AccountInfo?> fetchAccountInfo({YoutubeSession? session}) async {
     final http.Response? response = await _postAccountMenu(session: session);
     if (response == null || response.statusCode != 200) return null;
     try {
-      return _findAccountName(jsonDecode(utf8.decode(response.bodyBytes)));
+      final dynamic root = jsonDecode(utf8.decode(response.bodyBytes));
+      return AccountInfo(
+        name: _findAccountName(root) ?? '',
+        email: _findAccountEmail(root),
+        avatarUrl: _findAccountAvatarUrl(root),
+      );
     } catch (e) {
-      debugPrint('[YouTubeMusicService] Gagal membaca nama akun: $e');
+      debugPrint('[YouTubeMusicService] Gagal membaca info akun: $e');
       return null;
     }
   }
@@ -528,6 +547,72 @@ class YouTubeMusicService {
       }
     }
     return null;
+  }
+
+  /// Menelusuri pohon respons account_menu dan mengambil email akun
+  /// pertama dari `accountItemRenderer.email` (simpleText atau runs).
+  static String? _findAccountEmail(dynamic node) {
+    if (node is Map<dynamic, dynamic>) {
+      final dynamic item = node['accountItemRenderer'];
+      if (item is Map<dynamic, dynamic>) {
+        final String? email = _runsText(item['email']);
+        if (email != null && email.isNotEmpty) return email;
+      }
+      for (final dynamic child in node.values) {
+        final String? found = _findAccountEmail(child);
+        if (found != null) return found;
+      }
+    } else if (node is List<dynamic>) {
+      for (final dynamic child in node) {
+        final String? found = _findAccountEmail(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  /// Menelusuri pohon respons account_menu dan mengambil URL foto akun
+  /// dari `accountPhoto`/`avatar` dengan thumbnail terbesar.
+  static String? _findAccountAvatarUrl(dynamic node) {
+    if (node is Map<dynamic, dynamic>) {
+      final String? fromPhoto =
+          _largestThumbnailUrl(node['accountPhoto']?['thumbnails']);
+      if (fromPhoto != null) return fromPhoto;
+      final String? fromAvatar =
+          _largestThumbnailUrl(node['avatar']?['thumbnails']);
+      if (fromAvatar != null) return fromAvatar;
+      for (final dynamic child in node.values) {
+        final String? found = _findAccountAvatarUrl(child);
+        if (found != null) return found;
+      }
+    } else if (node is List<dynamic>) {
+      for (final dynamic child in node) {
+        final String? found = _findAccountAvatarUrl(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  /// Memilih URL thumbnail terbesar dari daftar `{url, width, height}`,
+  /// mengikuti orientasi `//` milik Google menjadi `https:`.
+  static String? _largestThumbnailUrl(dynamic thumbnails) {
+    if (thumbnails is! List<dynamic> || thumbnails.isEmpty) return null;
+    String? bestUrl;
+    int bestWidth = -1;
+    for (final dynamic entry in thumbnails) {
+      if (entry is! Map<dynamic, dynamic>) continue;
+      final dynamic url = entry['url'];
+      if (url is! String || url.isEmpty) continue;
+      final dynamic width = entry['width'];
+      final int parsedWidth =
+          width is int ? width : int.tryParse('$width') ?? 0;
+      if (parsedWidth > bestWidth) {
+        bestWidth = parsedWidth;
+        bestUrl = url.startsWith('//') ? 'https:$url' : url;
+      }
+    }
+    return bestUrl;
   }
 
   /// Menelusuri seluruh pohon respons innertube dan mengumpulkan renderer

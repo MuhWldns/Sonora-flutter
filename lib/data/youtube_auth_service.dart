@@ -18,6 +18,7 @@ class YoutubeAuthService extends ChangeNotifier {
     required this.store,
     this.validate,
     this.fetchAccountName,
+    this.fetchAccountInfo,
   });
 
   /// Penyimpanan sesi (terenkripsi di perangkat; memori saat pengujian).
@@ -29,14 +30,30 @@ class YoutubeAuthService extends ChangeNotifier {
   /// Pengambil nama akun opsional untuk mengisi [accountName].
   final Future<String?> Function(YoutubeSession session)? fetchAccountName;
 
+  /// Pengambil info akun opsional untuk mengisi [accountEmail] dan
+  /// [accountAvatarUrl] (beserta [accountName] bila [fetchAccountName]
+  /// tidak disediakan).
+  final Future<AccountInfo?> Function(YoutubeSession session)?
+      fetchAccountInfo;
+
   YoutubeSession? _session;
   String? _accountName;
+  String? _accountEmail;
+  String? _accountAvatarUrl;
 
   /// True bila ada sesi aktif dengan cookie keluarga SAPISID.
   bool get signedIn => _session != null;
 
   /// Nama akun YouTube Music bila berhasil divalidasi; `null` bila belum.
   String? get accountName => _accountName;
+
+  /// Email akun YouTube Music bila tersedia; `null` bila belum masuk atau
+  /// Google tidak menyertakannya.
+  String? get accountEmail => _accountEmail;
+
+  /// URL foto profil akun bila tersedia; `null` bila belum masuk atau
+  /// tidak ada fotonya.
+  String? get accountAvatarUrl => _accountAvatarUrl;
 
   /// Sesi aktif; `null` bila belum masuk.
   YoutubeSession? get session => _session;
@@ -84,7 +101,7 @@ class YoutubeAuthService extends ChangeNotifier {
       return false;
     }
     _session = session;
-    _accountName = await _resolveAccountName(session);
+    await _resolveAccountFields(session);
     notifyListeners();
     return true;
   }
@@ -98,6 +115,8 @@ class YoutubeAuthService extends ChangeNotifier {
     }
     _session = null;
     _accountName = null;
+    _accountEmail = null;
+    _accountAvatarUrl = null;
     notifyListeners();
   }
 
@@ -127,7 +146,7 @@ class YoutubeAuthService extends ChangeNotifier {
       return;
     }
     _session = session;
-    _accountName = await _resolveAccountName(session);
+    await _resolveAccountFields(session);
     notifyListeners();
   }
 
@@ -141,6 +160,32 @@ class YoutubeAuthService extends ChangeNotifier {
     }
   }
 
+  /// Mengisi nama, email, dan avatar akun dari callback yang tersedia.
+  ///
+  /// [fetchAccountInfo] dipakai bila tersedia (satu request untuk semua
+  /// field); bila tidak, kembali ke [fetchAccountName] untuk nama saja.
+  /// Kegagalan jaringan tidak pernah menggagalkan capture/restore.
+  Future<void> _resolveAccountFields(YoutubeSession session) async {
+    _accountName = null;
+    _accountEmail = null;
+    _accountAvatarUrl = null;
+    final Future<AccountInfo?> Function(YoutubeSession)? infoFetcher =
+        fetchAccountInfo;
+    if (infoFetcher != null) {
+      try {
+        final AccountInfo? info = await infoFetcher(session);
+        final String name = info?.name ?? '';
+        _accountName = name.isEmpty ? null : name;
+        _accountEmail = info?.email;
+        _accountAvatarUrl = info?.avatarUrl;
+      } catch (_) {
+        // Info akun bersifat pelengkap; biarkan seluruh field null.
+      }
+      return;
+    }
+    _accountName = await _resolveAccountName(session);
+  }
+
   /// Membuang sesi yang tidak bisa dipulihkan tanpa memunculkan error.
   Future<void> _dropCorrupted() async {
     try {
@@ -150,5 +195,7 @@ class YoutubeAuthService extends ChangeNotifier {
     }
     _session = null;
     _accountName = null;
+    _accountEmail = null;
+    _accountAvatarUrl = null;
   }
 }

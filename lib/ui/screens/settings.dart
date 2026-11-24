@@ -891,37 +891,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
       listenable: scope.auth,
       builder: (BuildContext context, Widget? _) {
         final bool signedIn = scope.auth.signedIn;
-        final String account = scope.auth.accountName ?? '';
-        return _settingsCard(
-          context,
-          icon: Icons.account_circle_rounded,
-          title: 'Akun YouTube Music',
-          subtitle: signedIn
-              ? (account.isNotEmpty ? account : 'Akun Google')
-              : 'Masuk untuk membuka lagu yang disukai, riwayat, '
-                  'dan playlist kamu.',
-          children: <Widget>[
-            if (signedIn)
-              OutlinedButton.icon(
-                onPressed: _signingOut ? null : _confirmSignOut,
-                icon: _signingOut
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('Keluar'),
-              )
-            else
+        if (!signedIn) {
+          return _settingsCard(
+            context,
+            icon: Icons.account_circle_rounded,
+            title: 'Akun YouTube Music',
+            subtitle: 'Masuk untuk membuka lagu yang disukai, riwayat, '
+                'dan playlist kamu.',
+            children: <Widget>[
               FilledButton.icon(
                 onPressed: _openLogin,
                 icon: const Icon(Icons.login_rounded),
                 label: const Text('Masuk'),
               ),
-          ],
-        );
+            ],
+          );
+        }
+        return _signedInAccountCard(context, scope);
       },
+    );
+  }
+
+  /// Kartu profil saat sudah masuk: avatar, nama, email, dan tombol keluar.
+  /// Container mengikuti gaya [_settingsCard] agar konsisten dengan kartu lain.
+  Widget _signedInAccountCard(BuildContext context, SonoraScope scope) {
+    final ColorScheme scheme = context.scheme;
+    final String name = scope.auth.accountName ?? 'Akun Google';
+    final String? email = scope.auth.accountEmail;
+    final String? avatarUrl = scope.auth.accountAvatarUrl;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(kSpaceLg),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(kRadiusLg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.account_circle_rounded,
+                size: 22,
+                color: scheme.primary,
+              ),
+              const SizedBox(width: kSpaceSm),
+              Text('Akun YouTube Music', style: context.texts.titleMedium),
+            ],
+          ),
+          const SizedBox(height: kSpaceMd),
+          Row(
+            children: <Widget>[
+              _accountAvatar(context, avatarUrl),
+              const SizedBox(width: kSpaceMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      name,
+                      style: context.texts.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (email != null && email.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        style: context.texts.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpaceMd),
+          OutlinedButton.icon(
+            onPressed: _signingOut ? null : _confirmSignOut,
+            icon: _signingOut
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout_rounded, size: 20),
+            label: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Avatar akun: foto profil bila URL tersedia, fallback ikon saat kosong
+  /// atau gagal dimuat.
+  Widget _accountAvatar(BuildContext context, String? avatarUrl) {
+    final ColorScheme scheme = context.scheme;
+    const double size = 52;
+    final Widget fallback = Icon(
+      Icons.person_rounded,
+      size: 30,
+      color: scheme.onSurfaceVariant,
+    );
+    final String? url =
+        (avatarUrl == null || avatarUrl.isEmpty) ? null : avatarUrl;
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: scheme.surfaceContainerHighest,
+      child: url == null
+          ? fallback
+          : ClipOval(
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (BuildContext _, Object _, StackTrace? _) => fallback,
+                  frameBuilder: (
+                    BuildContext _,
+                    Widget child,
+                    int? frame,
+                    bool wasLoaded,
+                  ) =>
+                      (frame == null && !wasLoaded)
+                          ? ColoredBox(
+                              color: scheme.surfaceContainerHighest,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : child,
+                ),
+              ),
+            ),
     );
   }
 

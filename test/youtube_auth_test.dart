@@ -95,6 +95,76 @@ const String _accountMenuJson = '''
 }
 ''';
 
+/// Respons account_menu lengkap: nama, email (runs), dan avatar bertingkat
+/// untuk menguji pemilihan thumbnail terbesar.
+const String _accountMenuFullJson = '''
+{
+  "actions": [
+    {
+      "accountMenuRenderer": {
+        "multiPageMenuRenderer": {
+          "sections": [
+            {
+              "accountSectionRenderer": {
+                "contents": [
+                  {
+                    "accountItemRenderer": {
+                      "accountName": {"simpleText": "Siti"},
+                      "email": {"runs": [{"text": "siti@example.com"}]},
+                      "accountPhoto": {
+                        "thumbnails": [
+                          {
+                            "url": "https://lh3.googleusercontent.com/a/s32",
+                            "width": 32,
+                            "height": 32
+                          },
+                          {
+                            "url": "https://lh3.googleusercontent.com/a/s256",
+                            "width": 256,
+                            "height": 256
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+''';
+
+/// Respons account_menu tanpa email dan avatar — keduanya harus null.
+const String _accountMenuSparseJson = '''
+{
+  "actions": [
+    {
+      "accountMenuRenderer": {
+        "multiPageMenuRenderer": {
+          "sections": [
+            {
+              "accountSectionRenderer": {
+                "contents": [
+                  {
+                    "accountItemRenderer": {
+                      "accountName": {"simpleText": "Budi"}
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+''';
+
 YoutubeSession _session({String? pageId}) => YoutubeSession(
       cookie: _validCookie,
       pageId: pageId,
@@ -617,6 +687,212 @@ void main() {
 
       expect(await service.validateSession(), isFalse);
       service.dispose();
+    });
+  });
+  group('YouTubeMusicService.fetchAccountInfo', () {
+    test('mengambil nama, email, dan avatar terbesar dari account_menu',
+        () async {
+      http.Request? captured;
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async {
+          captured = request;
+          return _jsonResponse(_accountMenuFullJson);
+        }),
+      );
+      service.sessionProvider = () async => _session();
+
+      final AccountInfo? info = await service.fetchAccountInfo();
+
+      expect(captured!.url.path, '/youtubei/v1/account/account_menu');
+      expect(info, isNotNull);
+      expect(info!.name, 'Siti');
+      expect(info.email, 'siti@example.com');
+      // Thumbnail terbesar (width 256) yang dipilih, bukan yang 32px.
+      expect(info.avatarUrl, 'https://lh3.googleusercontent.com/a/s256');
+      service.dispose();
+    });
+
+    test('email dan avatar yang hilang menjadi null tanpa melempar',
+        () async {
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse(_accountMenuSparseJson)),
+      );
+      service.sessionProvider = () async => _session();
+
+      final AccountInfo? info = await service.fetchAccountInfo();
+
+      expect(info, isNotNull);
+      expect(info!.name, 'Budi');
+      expect(info.email, isNull);
+      expect(info.avatarUrl, isNull);
+      service.dispose();
+    });
+
+    test('mengembalikan null saat HTTP gagal atau respons rusak', () async {
+      final YouTubeMusicService failing = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('{"error": "server"}', 500)),
+      );
+      failing.sessionProvider = () async => _session();
+      expect(await failing.fetchAccountInfo(), isNull);
+      failing.dispose();
+
+      final YouTubeMusicService broken = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse('bukan json')),
+      );
+      broken.sessionProvider = () async => _session();
+      expect(await broken.fetchAccountInfo(), isNull);
+      broken.dispose();
+    });
+
+    test('fetchAccountName tetap bekerja lewat fetchAccountInfo', () async {
+      final YouTubeMusicService service = YouTubeMusicService(
+        httpClient: MockClient((http.Request request) async =>
+            _jsonResponse(_accountMenuFullJson)),
+      );
+      service.sessionProvider = () async => _session();
+      expect(await service.fetchAccountName(), 'Siti');
+      service.dispose();
+    });
+  });
+
+  group('YoutubeAuthService info akun (email + avatar)', () {
+    test('capture mengisi email dan avatar dari fetchAccountInfo', () async {
+      final InMemorySessionStore store = InMemorySessionStore();
+      final YoutubeAuthService auth = YoutubeAuthService(
+        store: store,
+        fetchAccountInfo: (YoutubeSession session) async => AccountInfo(
+          name: 'Budi',
+          email: 'budi@example.com',
+          avatarUrl: 'https://example.com/budi.png',
+        ),
+      );
+
+      final bool ok = await auth.capture(
+        cookie: _validCookie,
+        dataSyncId: 'ds',
+        authUser: '0',
+        visitorData: 'v',
+        clientVersion: '1.0.0',
+      );
+
+      expect(ok, isTrue);
+      expect(auth.signedIn, isTrue);
+      expect(auth.accountName, 'Budi');
+      expect(auth.accountEmail, 'budi@example.com');
+      expect(auth.accountAvatarUrl, 'https://example.com/budi.png');
+    });
+
+    test('restore mengisi email dan avatar dari fetchAccountInfo', () async {
+      final InMemorySessionStore store = InMemorySessionStore();
+      await store.write(jsonEncode(_session().toJson()));
+      int calls = 0;
+      final YoutubeAuthService auth = YoutubeAuthService(
+        store: store,
+        fetchAccountInfo: (YoutubeSession session) async {
+          calls++;
+          return AccountInfo(
+            name: 'Siti',
+            email: 'siti@example.com',
+            avatarUrl: 'https://example.com/siti.png',
+          );
+        },
+      );
+
+      await auth.restore();
+
+      expect(calls, 1);
+      expect(auth.signedIn, isTrue);
+      expect(auth.accountName, 'Siti');
+      expect(auth.accountEmail, 'siti@example.com');
+      expect(auth.accountAvatarUrl, 'https://example.com/siti.png');
+    });
+
+    test('fetchAccountInfo yang gagal tidak menggagalkan capture', () async {
+      final InMemorySessionStore store = InMemorySessionStore();
+      final YoutubeAuthService auth = YoutubeAuthService(
+        store: store,
+        fetchAccountInfo: (YoutubeSession session) async =>
+            throw Exception('jaringan putus'),
+      );
+
+      final bool ok = await auth.capture(
+        cookie: _validCookie,
+        dataSyncId: 'ds',
+        authUser: '0',
+        visitorData: 'v',
+        clientVersion: '1.0.0',
+      );
+
+      expect(ok, isTrue);
+      expect(auth.signedIn, isTrue);
+      expect(auth.accountName, isNull);
+      expect(auth.accountEmail, isNull);
+      expect(auth.accountAvatarUrl, isNull);
+    });
+
+    test('signOut mengosongkan email dan avatar akun', () async {
+      final InMemorySessionStore store = InMemorySessionStore();
+      final YoutubeAuthService auth = YoutubeAuthService(
+        store: store,
+        fetchAccountInfo: (YoutubeSession session) async => AccountInfo(
+          name: 'Budi',
+          email: 'budi@example.com',
+          avatarUrl: 'https://example.com/budi.png',
+        ),
+      );
+      await auth.capture(
+        cookie: _validCookie,
+        dataSyncId: 'ds',
+        authUser: '0',
+        visitorData: 'v',
+        clientVersion: '1.0.0',
+      );
+      expect(auth.accountEmail, isNotNull);
+
+      await auth.signOut();
+
+      expect(auth.signedIn, isFalse);
+      expect(auth.accountName, isNull);
+      expect(auth.accountEmail, isNull);
+      expect(auth.accountAvatarUrl, isNull);
+    });
+
+    test('fetchAccountInfo dipakai tanpa memanggil fetchAccountName',
+        () async {
+      final InMemorySessionStore store = InMemorySessionStore();
+      int nameCalls = 0;
+      int infoCalls = 0;
+      final YoutubeAuthService auth = YoutubeAuthService(
+        store: store,
+        fetchAccountName: (YoutubeSession session) async {
+          nameCalls++;
+          return 'Nama Lama';
+        },
+        fetchAccountInfo: (YoutubeSession session) async {
+          infoCalls++;
+          return const AccountInfo(
+            name: 'Nama Baru',
+            email: 'baru@example.com',
+          );
+        },
+      );
+
+      await auth.capture(
+        cookie: _validCookie,
+        dataSyncId: 'ds',
+        authUser: '0',
+        visitorData: 'v',
+        clientVersion: '1.0.0',
+      );
+
+      expect(infoCalls, 1);
+      expect(nameCalls, 0);
+      expect(auth.accountName, 'Nama Baru');
+      expect(auth.accountEmail, 'baru@example.com');
+      expect(auth.accountAvatarUrl, isNull);
     });
   });
 }

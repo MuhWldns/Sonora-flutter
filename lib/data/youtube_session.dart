@@ -160,3 +160,24 @@ class InMemorySessionStore implements SessionStore {
     _value = null;
   }
 }
+
+/// Informasi profil akun YouTube Music hasil parsing `account_menu`.
+///
+/// Field yang tidak ditemukan pada respons bernilai `null`; [name] kosong
+/// berarti nama akun tidak berhasil dibaca dari respons.
+class AccountInfo {
+  const AccountInfo({
+    required this.name,
+    this.email,
+    this.avatarUrl,
+  });
+
+  /// Nama tampilan akun; string kosong bila tidak ditemukan.
+  final String name;
+
+  /// Email akun; `null` bila Google tidak menyertakannya.
+  final String? email;
+
+  /// URL foto profil (thumbnail terbesar); `null` bila tidak ada.
+  final String? avatarUrl;
+}

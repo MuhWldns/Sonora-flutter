@@ -62,6 +62,8 @@ class _StartupState extends State<_Startup> {
             music.validateSession(session: session),
         fetchAccountName: (YoutubeSession session) =>
             music.fetchAccountName(session: session),
+        fetchAccountInfo: (YoutubeSession session) =>
+            music.fetchAccountInfo(session: session),
       );
       auth = authService;
       try {
