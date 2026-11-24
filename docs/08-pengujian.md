@@ -51,7 +51,7 @@ flutter test test/blackbox_ui_test.dart
 
 ### Cakupan
 
-23 test yang memetakan matriks kasus uji di `docs/testing/01-blackbox-testing.md` untuk 6 modul:
+23 test yang memetakan 6 modul pertama matriks kasus uji di `docs/testing/01-blackbox-testing.md`; matriks manual itu kini memuat **8 modul / 44 kasus uji**, dengan dua modul terakhir (`TC-ACC`, `TC-PRS`) diverifikasi manual di perangkat karena bergantung pada sesi akun Google nyata:
 
 - `TC-SET` — Pengaturan, ekstensi Add-on proxy, manajemen cache.
 - `TC-PLY` — Pemutar audio & layanan latar belakang.
@@ -59,5 +59,7 @@ flutter test test/blackbox_ui_test.dart
 - `TC-LIB` — Koleksi, playlist lokal, statistik.
 - `TC-LYR` — Lirik tersinkronisasi.
 - `TC-BRW` — Browse & ketahanan jaringan (auto-fallback saat proxy offline).
+- `TC-ACC` — Akun & login YouTube Music (WebView Google, validasi sesi, kartu profil, restore sesi terenkripsi, konten personal Koleksi).
+- `TC-PRS` — Beranda & pencarian personal (rak YouTube Music, fallback pencarian anonim, penyembunyian rak kosong, fallback lirik).
 
 Karena menyentuh jaringan nyata, hasilnya bergantung pada ketersediaan endpoint eksternal; kegagalan pada file ini bukan indikasi regresi kode lokal.
