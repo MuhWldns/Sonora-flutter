@@ -1,7 +1,8 @@
 /// Layar masuk YouTube Music: WebView login Google yang menangkap sesi
 /// (cookie + ytcfg) dan menyerahkannya ke [YoutubeAuthService] lewat
-/// [SonoraScope]. Berhasil → kembali ke layar sebelumnya; gagal → tetap di
-/// halaman agar pengguna dapat menyelesaikan login.
+/// [SonoraScope]. Penangkapan dilakukan manual lewat tombol "Gunakan Akun"
+/// setelah pengguna diarahkan ke halaman YouTube Music — tanpa polling
+/// otomatis, sehingga tidak ada notifikasi gagal yang muncul sendiri.
 library;
 
 import 'dart:convert';
@@ -42,7 +43,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   late final WebViewController _controller;
   bool _capturing = false;
-  bool _captured = false;
+
+  /// True bila WebView sedang berada di halaman music.youtube.com —
+  /// syarat tombol "Gunakan Akun" aktif.
+  bool _onMusicHost = false;
 
   @override
   void initState() {
@@ -59,21 +63,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   NavigationDecision _onNavigationRequest(NavigationRequest request) {
-    // Biarkan semua navigasi berjalan; penangkapan dilakukan di
-    // [onPageFinished] setelah halaman Music benar-benar termuat.
+    _updateMusicHost(Uri.tryParse(request.url));
+    // Biarkan semua navigasi berjalan; penangkapan sesi dilakukan manual
+    // lewat tombol "Gunakan Akun".
     return NavigationDecision.navigate;
   }
 
-  Future<void> _onPageFinished(String url) async {
-    if (_captured || _capturing) return;
-    final Uri? uri = Uri.tryParse(url);
-    if (uri == null || !uri.host.contains(_kMusicHost)) return;
-    await _captureSession();
+  void _onPageFinished(String url) {
+    _updateMusicHost(Uri.tryParse(url));
   }
 
-  /// Mengambil cookie + nilai ytcfg lalu menyerahkannya ke layar data.
+  /// Memperbarui penanda halaman Music; hanya membangun ulang saat berubah.
+  void _updateMusicHost(Uri? uri) {
+    final bool onMusic = uri != null && uri.host.contains(_kMusicHost);
+    if (mounted && onMusic != _onMusicHost) {
+      setState(() => _onMusicHost = onMusic);
+    }
+  }
+
+  /// Satu percobaan penangkapan sesi: cookie + probe ytcfg sekali jalan,
+  /// lalu diserahkan ke [YoutubeAuthService]. Gagal cukup diulang dengan
+  /// menekan tombol lagi — tanpa percobaan otomatis.
   Future<void> _captureSession() async {
-    if (_capturing || _captured) return;
+    if (_capturing) return;
     setState(() => _capturing = true);
     try {
       // 1) Cookie untuk domain Music (jangan pernah dicetak/log).
@@ -89,8 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final Map<String, dynamic> cfg = _parseProbe(result);
 
-      // 3) Serahkan ke service; nilai kosong tetap dicoba — service yang
-      //    memutuskan validitas sesi.
+      // 3) Serahkan ke service; service yang memutuskan validitas sesi.
       final String pageId = cfg['pageId'] as String? ?? '';
       if (!mounted) return;
       final bool ok = await SonoraScope.of(context).auth.capture(
@@ -103,11 +114,10 @@ class _LoginScreenState extends State<LoginScreen> {
           );
       if (!mounted) return;
       if (ok) {
-        _captured = true;
         showSonoraSnack(context, 'Berhasil masuk', success: true);
         Navigator.of(context).pop();
       } else {
-        // Sesi ditolak: tetap di halaman agar pengguna bisa mencoba lagi.
+        // Sesi ditolak: tetap di halaman; pengguna bisa menekan tombol lagi.
         showSonoraSnack(context, 'Sesi tidak valid, coba lagi');
       }
     } catch (_) {
@@ -122,10 +132,11 @@ class _LoginScreenState extends State<LoginScreen> {
   /// bool, atau num — normalisasi menjadi peta yang aman.
   Map<String, dynamic> _parseProbe(Object result) {
     try {
-      final String raw =
-          result is String ? result : result.toString();
+      final String raw = result is String ? result : result.toString();
       final String trimmed = raw.trim();
-      if (trimmed.isEmpty || trimmed == 'null') return const <String, dynamic>{};
+      if (trimmed.isEmpty || trimmed == 'null') {
+        return const <String, dynamic>{};
+      }
       final Object? decoded = jsonDecode(trimmed);
       return decoded is Map<String, dynamic>
           ? decoded
@@ -150,9 +161,36 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: scheme.surface,
       body: Column(
         children: <Widget>[
-          if (_capturing) const LinearProgressIndicator(minHeight: 2),
           Expanded(
             child: WebViewWidget(controller: _controller),
+          ),
+          if (_capturing) const LinearProgressIndicator(minHeight: 2),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Masuk ke Google, lalu tekan Gunakan Akun setelah '
+                    'diarahkan ke YouTube Music.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed:
+                          _onMusicHost && !_capturing ? _captureSession : null,
+                      child: const Text('Gunakan Akun'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
