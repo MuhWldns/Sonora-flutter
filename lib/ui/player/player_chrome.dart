@@ -15,6 +15,7 @@ import '../app_scope.dart';
 import '../player_actions.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'lyrics_loader.dart';
 import 'player_controller.dart';
 
 /// Dock mini-player: kaca translusen (blur 16 + border tipis), micro-bar
@@ -676,9 +677,6 @@ String _repeatLabel(PlayerRepeatMode mode) => switch (mode) {
       PlayerRepeatMode.one => 'Ulangi: satu lagu',
     };
 
-/// Fase pemuatan lirik.
-enum _LyricsPhase { idle, loading, ready, unavailable }
-
 /// Tampilan lirik: latar artwork blur + scrim, baris rata kiri, baris aktif
 /// crimson besar yang fade saat berganti, kontrol kompak di bawah.
 class _LyricsView extends StatefulWidget {
@@ -699,69 +697,58 @@ class _LyricsView extends StatefulWidget {
 
 class _LyricsViewState extends State<_LyricsView> {
   LyricsRepository? _repo;
-  _LyricsPhase _phase = _LyricsPhase.idle;
-  LrcLyrics? _lyrics;
-  String _lyricsKey = '';
+  LyricsLoader? _loader;
   int _lastActive = -1;
   final Map<int, GlobalKey> _lineKeys = <int, GlobalKey>{};
 
   @override
   void initState() {
     super.initState();
-    _loadLyrics();
+    _loader = LyricsLoader(fetch: _fetchLyrics);
+    _scheduleLoad();
   }
 
   @override
   void didUpdateWidget(_LyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.track.videoId != widget.track.videoId) _loadLyrics();
+    if (oldWidget.track.videoId != widget.track.videoId) {
+      // Lagu berganti: reset penanda baris lalu siapkan fase memuat agar
+      // keadaan lagu sebelumnya tidak sempat terlihat di build berjalan.
+      _lineKeys.clear();
+      _lastActive = -1;
+      _loader!.prepare(widget.track.videoId);
+      _scheduleLoad(force: true);
+    }
   }
 
   @override
   void dispose() {
+    _loader?.dispose();
     _repo?.dispose();
     super.dispose();
   }
 
-  Future<void> _loadLyrics() async {
-    final String key = widget.track.videoId;
-    if (key == _lyricsKey) return;
-    _lyricsKey = key;
-    _lineKeys.clear();
-    _lastActive = -1;
-    if (key.isEmpty) {
-      if (mounted) setState(() => _phase = _LyricsPhase.unavailable);
-      return;
-    }
-    if (mounted) setState(() => _phase = _LyricsPhase.loading);
+  /// Memuat lirik pada frame berikutnya; notifikasi fase tidak boleh terjadi
+  /// di tengah proses build dan pembacaan SonoraScope perlu elemen aktif.
+  void _scheduleLoad({bool force = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loader!.load(widget.track.videoId, force: force);
+    });
+  }
+
+  /// Mengambil lirik lagu aktif: proxy Sonora dahulu, lalu LRCLIB langsung.
+  /// Berbentuk closure agar [LyricsLoader] dapat diuji tanpa jaringan.
+  Future<LrcLyrics?> _fetchLyrics() {
     _repo ??= LyricsRepository();
     final api = SonoraScope.of(context).api;
     final (String trackName, String artistName) = _lyricsQueryNames();
-    // Pagu total: apa pun yang gagal atau menggantung (proxy/LRCLIB), fallback
-    // "lirik tidak ditemukan" tetap tampil, tidak ada skeleton selamanya.
-    LrcLyrics? lyrics;
-    try {
-      lyrics = await _repo!.find(
-        track: trackName,
-        artist: artistName,
-        videoId: widget.track.videoId,
-        durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
-        proxyLyrics: api.lyrics,
-      ).timeout(const Duration(seconds: 12));
-    } catch (_) {
-      lyrics = null;
-    }
-    // Balasan basi: lagu sudah berganti saat permintaan berjalan.
-    if (!mounted || _lyricsKey != widget.track.videoId) return;
-    setState(() {
-      if (lyrics == null) {
-        _phase = _LyricsPhase.unavailable;
-        _lyrics = null;
-      } else {
-        _phase = _LyricsPhase.ready;
-        _lyrics = lyrics;
-      }
-    });
+    return _repo!.find(
+      track: trackName,
+      artist: artistName,
+      videoId: widget.track.videoId,
+      durationMs: widget.track.durationMs > 0 ? widget.track.durationMs : null,
+      proxyLyrics: api.lyrics,
+    );
   }
 
   /// Menyusun nama lagu/artis yang bersih dari metadata YouTube agar
@@ -823,70 +810,77 @@ class _LyricsViewState extends State<_LyricsView> {
     final ColorScheme scheme = context.scheme;
     final SonoraColors sonora = context.sonora;
     final bool dark = Theme.of(context).brightness == Brightness.dark;
-    final LrcLyrics? lyrics = _lyrics;
-    final int? active =
-        _phase == _LyricsPhase.ready && lyrics!.hasSynced
+
+    return ListenableBuilder(
+      listenable: _loader!,
+      builder: (BuildContext context, Widget? _) {
+        final LrcLyrics? lyrics = _loader!.lyrics;
+        final int? active = _loader!.phase == LyricsPhase.ready &&
+                lyrics != null &&
+                lyrics.hasSynced
             ? lyrics.activeIndexAt(widget.snap.position)
             : null;
-    _scheduleAutoScroll(active);
+        _scheduleAutoScroll(active);
 
-    return Stack(
-      fit: StackFit.expand,
-      children: <Widget>[
-        // Latar artwork blur (kaca/pemudaran punya sesuatu untuk direfraksikan).
-        if ((widget.track.thumbnail ?? '').isNotEmpty)
-          Positioned.fill(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 46, sigmaY: 46),
-              child: Image.network(
-                widget.track.thumbnail!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        return Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            // Latar artwork blur (kaca/pemudaran punya sesuatu untuk direfraksikan).
+            if ((widget.track.thumbnail ?? '').isNotEmpty)
+              Positioned.fill(
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 46, sigmaY: 46),
+                  child: Image.network(
+                    widget.track.thumbnail!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              )
+            else
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: <Color>[sonora.glow, scheme.surface],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          )
-        else
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  colors: <Color>[sonora.glow, scheme.surface],
+            // Scrim berjenjang agar teks selalu terbaca.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const <double>[0.0, 0.45, 1.0],
+                    colors: <Color>[
+                      scheme.surface.withValues(alpha: dark ? 0.32 : 0.55),
+                      scheme.surface.withValues(alpha: dark ? 0.42 : 0.62),
+                      scheme.surface.withValues(alpha: dark ? 0.88 : 0.94),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        // Scrim berjenjang agar teks selalu terbaca.
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const <double>[0.0, 0.45, 1.0],
-                colors: <Color>[
-                  scheme.surface.withValues(alpha: dark ? 0.32 : 0.55),
-                  scheme.surface.withValues(alpha: dark ? 0.42 : 0.62),
-                  scheme.surface.withValues(alpha: dark ? 0.88 : 0.94),
-                ],
-              ),
+            // Isi: baris lirik + kontrol kompak.
+            Column(
+              children: <Widget>[
+                Expanded(child: _lyricsBody(context, active)),
+                _CompactControls(player: widget.player, snap: widget.snap),
+              ],
             ),
-          ),
-        ),
-        // Isi: baris lirik + kontrol kompak.
-        Column(
-          children: <Widget>[
-            Expanded(child: _lyricsBody(context, active)),
-            _CompactControls(player: widget.player, snap: widget.snap),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _lyricsBody(BuildContext context, int? active) {
-    switch (_phase) {
-      case _LyricsPhase.idle:
-      case _LyricsPhase.loading:
+    switch (_loader!.phase) {
+      case LyricsPhase.idle:
+      case LyricsPhase.loading:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
           child: Column(
@@ -902,35 +896,17 @@ class _LyricsViewState extends State<_LyricsView> {
             ],
           ),
         );
-      case _LyricsPhase.unavailable:
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                Icons.lyrics_outlined,
-                size: 40,
-                color: context.scheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: kSpaceMd),
-              Text('Lirik tidak ditemukan', style: context.texts.titleMedium),
-              const SizedBox(height: kSpaceXs),
-              Text(
-                'LRCLIB tidak punya lirik untuk lagu ini.',
-                style: context.texts.bodySmall
-                    ?.copyWith(color: context.scheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        );
-      case _LyricsPhase.ready:
-        final List<LrcLine> lines = _lyrics!.synced;
+      case LyricsPhase.unavailable:
+        return _LyricsUnavailable(onRetry: () => _loader!.retry());
+      case LyricsPhase.ready:
+        final LrcLyrics lyrics = _loader!.lyrics!;
+        final List<LrcLine> lines = lyrics.synced;
         if (lines.isEmpty) {
           // Lirik polos tanpa sinkronisasi: tampil sebagai paragraf.
           return SingleChildScrollView(
             padding: const EdgeInsets.all(kSpaceXl),
             child: Text(
-              _lyrics!.plain ?? '',
+              lyrics.plain ?? '',
               style: context.texts.bodyLarge?.copyWith(height: 1.7),
             ),
           );
@@ -976,6 +952,60 @@ class _LyricsViewState extends State<_LyricsView> {
           },
         );
     }
+  }
+}
+
+/// Keadaan "lirik tidak tersedia": ikon tenang di lingkaran permukaan,
+/// judul, keterangan singkat, dan aksi coba lagi — terlihat disengaja,
+/// bukan seperti galat. Semua warna diambil dari token tema (Nocturne).
+class _LyricsUnavailable extends StatelessWidget {
+  const _LyricsUnavailable({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = context.scheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh.withValues(alpha: 0.55),
+                shape: BoxShape.circle,
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Icon(
+                Icons.lyrics_rounded,
+                size: 28,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: kSpaceLg),
+            Text('Lirik tidak tersedia', style: context.texts.titleMedium),
+            const SizedBox(height: kSpaceXs),
+            Text(
+              'Lagu ini belum memiliki lirik yang tersinkron.',
+              textAlign: TextAlign.center,
+              style: context.texts.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: kSpaceSm),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
