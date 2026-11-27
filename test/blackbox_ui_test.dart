@@ -617,8 +617,12 @@ void main() {
 
       final Finder btn = find.widgetWithText(OutlinedButton, 'Bersihkan');
       await tester.tap(btn);
+      // Pengukuran ukuran cache kini benar-benar asinkron (I/O berkas nyata),
+      // jadi beri kesempatan event loop nyata menyelesaikannya sebelum pump.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 500)),
+      );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
 
       expect(
         find.text('Cache audio berhasil dibersihkan.'),

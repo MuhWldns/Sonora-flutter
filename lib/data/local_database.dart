@@ -201,6 +201,23 @@ class LocalDatabase {
 
     // 5. Statistik Mendengarkan
     await _createListeningLogsTable(db);
+    await _ensureFavoritesPlaylist(db);
+  }
+
+  static Future<void> _ensureFavoritesPlaylist(DatabaseExecutor db) async {
+    await db.insert(tablePlaylists, <String, Object?>{
+      'id': 'favorites',
+      'name': 'Favorit',
+      'description': 'Lagu yang kamu sukai',
+      'created_at': 0,
+      'updated_at': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.execute('''
+      INSERT OR IGNORE INTO $tablePlaylistTracks
+      (playlist_id, video_id, title, artist, thumbnail, duration, added_at)
+      SELECT 'favorites', video_id, title, artist, thumbnail, duration, added_at
+      FROM $tableFavoriteTracks
+    ''');
   }
 
   static Future<void> _createPlaylistTables(DatabaseExecutor db) async {
@@ -337,19 +354,6 @@ class LocalDatabase {
   });
 
   Future<List<Map<String, Object?>>> getPlaylists() async {
-    await _db.insert(tablePlaylists, <String, Object?>{
-      'id': 'favorites',
-      'name': 'Favorit',
-      'description': 'Lagu yang kamu sukai',
-      'created_at': 0,
-      'updated_at': 0,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    await _db.execute('''
-      INSERT OR IGNORE INTO $tablePlaylistTracks
-      (playlist_id, video_id, title, artist, thumbnail, duration, added_at)
-      SELECT 'favorites', video_id, title, artist, thumbnail, duration, added_at
-      FROM $tableFavoriteTracks
-    ''');
     final rows = await _db.rawQuery(
       '''
       SELECT p.*, COUNT(t.video_id) AS track_count

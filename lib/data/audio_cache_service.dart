@@ -25,12 +25,11 @@ class AudioCacheService {
   static Future<int> getCacheSizeBytes() async {
     try {
       final Directory dir = await getCacheDirectory();
-      if (!dir.existsSync()) return 0;
+      if (!await dir.exists()) return 0;
       int total = 0;
-      for (final FileSystemEntity entity
-          in dir.listSync(recursive: true, followLinks: false)) {
+      await for (final FileSystemEntity entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is File) {
-          total += entity.lengthSync();
+          total += await entity.length();
         }
       }
       return total;

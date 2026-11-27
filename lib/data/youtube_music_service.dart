@@ -104,19 +104,12 @@ class YouTubeMusicService {
 
       final List<StreamInfo> candidates = _orderCandidates(manifest, quality);
 
-      // Uji seluruh kandidat secara paralel agar lagu cepat mulai; urutan
-      // preferensi tetap dipakai saat memilih kandidat pertama yang lolos.
-      final List<bool> usable = await Future.wait(
-        candidates.map((StreamInfo stream) => _streamUsable(stream.url)),
-      );
-      for (var i = 0; i < candidates.length; i++) {
-        if (!usable[i]) continue;
-        final Uri uri = candidates[i].url;
-        _streamCache[videoId] = _CachedStream(
-          uri: uri,
-          expiresAt: DateTime.now().add(_cacheTtl),
-        );
-        return uri;
+      // Probe candidates sequentially in order, returning the first usable one.
+      for (final candidate in candidates) {
+        if (await _streamUsable(candidate.url)) {
+          _streamCache[videoId] = _CachedStream(uri: candidate.url, expiresAt: DateTime.now().add(_cacheTtl));
+          return candidate.url;
+        }
       }
       debugPrint('[YouTubeMusicService] Tidak ada stream $videoId yang lolos uji akses.');
       return null;
