@@ -1236,25 +1236,32 @@ class _PlaylistDetailState extends State<PlaylistDetailScreen> {
         <SearchHistoryItem>[];
     final seen = <String>{};
     final found = <MusicItem>[];
-    for (final search in history) {
-      try {
-        List<MusicItem> results;
-        if (scope.settings.isConfigured) {
-          try {
-            final sections = await scope.api.search(search.query);
-            results = sections.expand((s) => s.items).toList();
-          } catch (_) {
-            results = await scope.ytService.search(search.query);
+    for (var i = 0; i < history.length && found.length < 30; i += 5) {
+      final batch = history.skip(i).take(5);
+      final results = await Future.wait(batch.map((search) async {
+        try {
+          List<MusicItem> items;
+          if (scope.settings.isConfigured) {
+            try {
+              final sections = await scope.api.search(search.query);
+              items = sections.expand((s) => s.items).toList();
+            } catch (_) {
+              items = await scope.ytService.search(search.query);
+            }
+          } else {
+            items = await scope.ytService.search(search.query);
           }
-        } else {
-          results = await scope.ytService.search(search.query);
+          return items;
+        } catch (_) {
+          return <MusicItem>[];
         }
-        for (final item in results) {
+      }));
+      for (final items in results) {
+        for (final item in items) {
           final id = item.videoId;
           if (id != null && id.isNotEmpty && seen.add(id)) found.add(item);
         }
-      } catch (_) {}
-      if (found.length >= 30) break;
+      }
     }
     if (found.isEmpty) {
       try {

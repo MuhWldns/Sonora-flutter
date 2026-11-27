@@ -66,24 +66,18 @@ class _StartupState extends State<_Startup> {
             music.fetchAccountInfo(session: session),
       );
       auth = authService;
-      try {
-        await authService.restore();
-      } catch (_) {
-        // Pemulihan sesi bersifat opsional; kegagalan tidak menggagalkan start.
-      }
+      final results = await Future.wait<dynamic>([
+        authService.restore().catchError((_) {}),
+        LocalDatabase.open()
+            .then<LocalDatabase?>((LocalDatabase db) => db, onError: (_, _) => null),
+      ]);
       music.sessionProvider = () async => authService.session;
       final audio = await SonoraAudioHandler.initialize(
         api,
         ytService: ytService,
         settings: settings,
       );
-      // Basis data lokal opsional: riwayat pencarian + favorit. Kegagalan
-      // membuka SQLite tidak boleh menggagalkan aplikasi.
-      try {
-        database = await LocalDatabase.open();
-      } catch (_) {
-        database = null;
-      }
+      database = results[1] as LocalDatabase?;
       // Pemangkasan cache audio di latar belakang (LRU) pada startup,
       // mengikuti batas yang dipilih pengguna (0 = tanpa batas).
       final int limitMb = settings.cacheLimitMb;

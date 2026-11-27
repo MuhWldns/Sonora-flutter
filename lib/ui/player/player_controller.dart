@@ -152,6 +152,9 @@ class PlayerController extends ChangeNotifier {
 
   List<MediaItem> _nativeQueue = const <MediaItem>[];
   MediaItem? _current;
+  List<PlayerTrack>? _cachedQueue;
+  List<MediaItem>? _cachedNativeQueue;
+  int _lastPublishedSecond = -1;
 
   DateTime? _lastPlayStartTime;
   int _accumulatedSeconds = 0;
@@ -493,7 +496,11 @@ class PlayerController extends ChangeNotifier {
     if (_duration <= Duration.zero && _current?.duration != null) {
       _duration = _current!.duration!;
     }
-    _publish(_compose());
+    final int currentSecond = position.inSeconds;
+    if (currentSecond != _lastPublishedSecond) {
+      _lastPublishedSecond = currentSecond;
+      _publish(_compose());
+    }
   }
 
   void _onError() {
@@ -537,10 +544,15 @@ class PlayerController extends ChangeNotifier {
   }
 
   PlayerSnapshot _compose() {
-    final List<PlayerTrack> queue = _nativeQueue
-        .map(PlayerTrack.fromMediaItem)
-        .where((PlayerTrack track) => track.videoId.isNotEmpty)
-        .toList(growable: false);
+    List<PlayerTrack>? queue = _cachedQueue;
+    if (queue == null || !identical(_nativeQueue, _cachedNativeQueue)) {
+      queue = _nativeQueue
+          .map(PlayerTrack.fromMediaItem)
+          .where((PlayerTrack track) => track.videoId.isNotEmpty)
+          .toList(growable: false);
+      _cachedQueue = queue;
+      _cachedNativeQueue = _nativeQueue;
+    }
     int index = -1;
     final MediaItem? current = _current;
     if (current != null) {
