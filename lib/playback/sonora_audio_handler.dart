@@ -259,36 +259,37 @@ class SonoraAudioHandler extends BaseAudioHandler
     });
   }
 
+  /// Memuat lagu pertama secara langsung lalu mengisi sisanya di latar
+  /// belakang. Dengan begitu audio mulai secepat mungkin tanpa menunggu
+  /// resolusi seluruh antrean.
   Future<bool> _applyQueue(
     List<MusicItem> playable,
     List<String> signature,
     int startIndex,
   ) async {
-    final futures = playable.map((item) async {
-      final videoId = item.videoId!;
-      Uri? uri;
-      try {
-        uri = await _yt.resolveStreamUri(
-          videoId,
-          quality: settings?.audioQuality ?? AudioQuality.auto,
-        );
-      } catch (_) {}
-      if (uri == null) {
-        throw const FormatException('Lagu ini tidak dapat diputar saat ini.');
-      }
-      return _audioSourceFor(item, uri);
-    });
+    final int safeIndex = startIndex.clamp(0, playable.length - 1);
 
-    final sources = await Future.wait(futures);
+    // 1. Resolve lagu pertama saja — ini yang menentukan seberapa cepat audio mulai.
+    final MusicItem firstItem = playable[safeIndex];
+    Uri? firstUri;
     try {
-      await _player.setAudioSources(
-        sources,
-        preload: false,
-        initialIndex: startIndex,
+      firstUri = await _yt.resolveStreamUri(
+        firstItem.videoId!,
+        quality: settings?.audioQuality ?? AudioQuality.auto,
+      );
+    } catch (_) {}
+    if (firstUri == null) {
+      _publishError('Lagu ini tidak dapat diputar saat ini.');
+      return false;
+    }
+
+    // 2. Set hanya lagu pertama ke player — audio bisa langsung mulai.
+    try {
+      await _player.setAudioSource(
+        _audioSourceFor(firstItem, firstUri),
         initialPosition: Duration.zero,
       );
     } on PlayerInterruptedException {
-      // A newer queue replaced this one mid-load; do not treat as loaded.
       return false;
     } on PlayerException catch (exception) {
       _publishError(_describe(exception));
@@ -297,16 +298,77 @@ class SonoraAudioHandler extends BaseAudioHandler
       _publishError(exception.toString());
       return false;
     }
-    _signature = signature;
-    // Broadcast so the notification and UI agree with the native playlist.
+    _signature = <String>[_trackKey(firstItem)];
     _publishQueue();
     _publishMediaItem();
+    _pruneCacheIfNeeded();
+
+    // 3. Isi sisa antrean di latar belakang — tidak menghalangi playback.
+    unawaited(_fillRemainingQueue(playable, safeIndex));
+    return true;
+  }
+
+  /// Mengisi sisa antrean di latar belakang setelah lagu pertama mulai.
+  Future<void> _fillRemainingQueue(
+    List<MusicItem> playable,
+    int firstIndex,
+  ) async {
+    final List<(int, MusicItem)> remaining = <(int, MusicItem)>[];
+    for (var i = 0; i < playable.length; i++) {
+      if (i != firstIndex) remaining.add((i, playable[i]));
+    }
+    if (remaining.isEmpty) return;
+
+    // Resolusi paralel terbatas (8 worker) agar tidak membanjiri YouTube.
+    final List<AudioSource?> resolved = List<AudioSource?>.filled(
+      remaining.length,
+      null,
+    );
+    int cursor = 0;
+    Future<void> worker() async {
+      while (cursor < remaining.length) {
+        final int i = cursor++;
+        final (int originalIndex, MusicItem item) = remaining[i];
+        final String? videoId = item.videoId;
+        if (videoId == null || videoId.isEmpty) continue;
+        try {
+          final Uri? uri = await _yt.resolveStreamUri(
+            videoId,
+            quality: settings?.audioQuality ?? AudioQuality.auto,
+          );
+          if (uri != null) resolved[i] = _audioSourceFor(item, uri);
+        } catch (_) {
+          // Lewati lagu yang gagal diresolve.
+        }
+      }
+    }
+    await Future.wait(<Future<void>>[
+      for (var w = 0; w < 8; w++) worker(),
+    ]);
+
+    if (_disposed) return;
+
+    // Susun sumber sesuai urutan asli, sisipkan setelah lagu pertama.
+    final List<AudioSource> sources = <AudioSource>[];
+    for (final AudioSource? source in resolved) {
+      if (source != null) sources.add(source);
+    }
+    if (sources.isEmpty) return;
+    try {
+      await _player.addAudioSources(sources);
+      // Perbarui signature agar konsisten dengan native playlist.
+      _signature = playable.map(_trackKey).toList();
+      _publishQueue();
+    } on PlayerInterruptedException {
+      // Antrean baru menggantikan yang lama; biarkan yang terbaru menang.
+    }
+  }
+
+  void _pruneCacheIfNeeded() {
     final int limitMb = settings?.cacheLimitMb ?? 500;
     if (limitMb > 0) {
-      // A limit of 0 means "unlimited": skip automatic pruning.
       unawaited(AudioCacheService.pruneCache(maxBytes: limitMb * 1024 * 1024));
     }
-    return true;
   }
 
   /// Membangun sumber audio untuk satu lagu dengan header seperti klien YouTube.
