@@ -311,17 +311,25 @@
         <pre><code>// 1. Memastikan engine Flutter siap sebelum operasi asinkron native dijalankan
 WidgetsFlutterBinding.ensureInitialized();
 
-// 2. _initialize() di _StartupState:
-settings = await SettingsStore.load();      // Memuat preferensi proxy dari storage
+// 2. _initialize() di _StartupState (bootstrap paralel):
+settings = await SettingsStore.load();      // Memuat preferensi (harus pertama)
 api = SonoraApi(settings);                  // Menyiapkan klien HTTP
-final audio = await SonoraAudioHandler.initialize(api); // Memulai AudioService Android native
+ytService = YouTubeMusicService();
 
-// 3. Jika audio berhasil siap:
-return SonoraApp(settings: _settings!, api: _api!, audio: _audio!);
+// restore() sesi YouTube & buka SQLite dijalankan PARALEL (independen):
+final results = await Future.wait([
+  authService.restore(),                     // pulihkan sesi terenkripsi
+  LocalDatabase.open(),                      // buka database lokal
+]);
 
-// 4. Jika gagal (misal izin sistem atau audio service error):
+// 3. AudioService Android native diinisialisasi setelah settings siap:
+final audio = await SonoraAudioHandler.initialize(api, ytService: ytService, settings: settings);
+
+// 4. Jika audio berhasil siap:
+return SonoraApp(settings: _settings!, api: _api!, audio: _audio!, ...);
+
+// 5. Jika gagal (misal izin sistem atau audio service error):
 // Menampilkan layar fallback ramah pengguna dengan tombol "Coba lagi", BUKAN crash putih!
-</code></pre>
       </div>
     </section>
 
@@ -440,6 +448,7 @@ Future&lt;List&lt;MusicSection&gt;&gt; browse(String browseId, {String? title, S
 </code></pre>
         <ul>
           <li><strong>Stream Resolution Bebas 403</strong>: Memprioritaskan stream audio berkualitas tinggi yang dapat diakses langsung oleh Android ExoPlayer dengan respon <code>206 Partial Content</code>.</li>
+          <li><strong>Uji Akses Sekuensial (<code>_streamUsable</code>)</strong>: Kandidat stream diuji <strong>satu per satu sesuai urutan preferensi</strong> — kandidat pertama yang lolos langsung dipakai. Tidak lagi mem-probe seluruh kandidat paralel, sehingga tidak membanjiri CDN GoogleVideo dengan puluhan koneksi TCP sekaligus.</li>
           <li><strong>Memory Caching (4 Jam)</strong>: Menyimpan cache URI stream selama 4 jam untuk menghindari overhead panggilan manifest berulang ke YouTube.</li>
           <li><strong>Dukungan Browse Mandiri</strong>: Membaca trek playlist YouTube secara langsung via <code>_yt.playlists.getVideos()</code> atau fallback cerdas via <code>search()</code> tanpa dependensi proxy.</li>
           <li><strong>Dispose Safety</strong>: Mengimplementasikan <code>dispose()</code> aman untuk membebaskan koneksi HTTP client <code>YoutubeExplode</code>.</li>
@@ -507,6 +516,7 @@ Future&lt;void&gt; pruneCache({int maxBytes, int targetBytes});
 String formatBytes(int bytes);
 </code></pre>
         <ul>
+          <li><strong>I/O Async (Non-Blocking)</strong>: <code>getCacheSizeBytes()</code> memakai <code>dir.list()</code> + <code>await entity.length()</code> (bukan <code>listSync</code>/<code>lengthSync</code>) sehingga menghitung ukuran cache tidak membekukan main isolate meski berisi ratusan berkas.</li>
           <li><strong>Pembersihan Otomatis LRU</strong>: Dijalankan saat startup aplikasi dan setelah antrean lagu dimuat. Bila ukuran cache melebihi 500 MB, sistem memangkas berkas yang paling lama tidak diakses (*Least Recently Used*) hingga tersisa 400 MB.</li>
           <li><strong>Pembersihan Manual</strong>: Tersedia tombol pembersih di layar Pengaturan disertai visualisasi progress bar penggunaan memori real-time.</li>
         </ul>
@@ -608,6 +618,7 @@ CREATE TABLE playlist_tracks (
           <li><code>createPlaylist(id, name)</code> & <code>updatePlaylist(...)</code>: Mengelola identitas playlist, deskripsi, dan cover art lokal/URL.</li>
           <li><code>addTrackToPlaylist(playlistId, track)</code> & <code>removeTrackFromPlaylist(...)</code>: Mengelola lagu di playlist.</li>
           <li><code>deletePlaylist(id)</code>: Menghapus playlist dengan kaskade penghapusan otomatis lagu-lagunya (ON DELETE CASCADE).</li>
+          <li><code>getPlaylists()</code> <strong>SELECT-only</strong>: Hanya membaca daftar playlist. Playlist bawaan "Favorit" + sinkronisasi <code>favorite_tracks</code> dibuat sekali di <code>_ensureFavoritesPlaylist()</code> (dipanggil dari <code>_createTables</code>), bukan INSERT di setiap pembacaan.</li>
         </ul>
       </div>
 
@@ -732,6 +743,10 @@ String? get accountAvatarUrl;</code></pre>
             Setiap kali antrean diganti atau tombol stop ditekan, angka <code>_generation</code> dinaikkan. Jika ada loading lagu lama yang baru selesai beberapa milidetik kemudian, lagu lama akan dibatalkan (*dropped*) karena nomor generasinya sudah basi.
           </li>
           <li>
+            <strong>Resolusi Antrean Lazy (<code>_applyQueue</code>)</strong>:
+            <em>Perbaikan "play lama banget"!</em> Dulu <code>_applyQueue</code> menunggu resolusi stream <strong>seluruh</strong> antrean (bisa 20–50 lagu × manifest + probe) sebelum lagu pertama mulai. Kini hanya lagu pertama yang di-resolve lalu <code>setAudioSource</code> (audio langsung bunyi); sisanya diisi di latar belakang oleh <code>_fillRemainingQueue()</code> (8 worker paralel via <code>addAudioSources</code>) tanpa menghalangi pemutaran.
+          </li>
+          <li>
             <strong>Pemisahan Lifecycle <code>play()</code></strong>:
             <em>Critical bug fix!</em> Di library <code>just_audio</code>, pemanggilan <code>await player.play()</code> baru akan selesai (complete) saat lagu <strong>berhenti/dijeda/selesai</strong>. Oleh karena itu, <code>playItems()</code> tidak boleh me-<code>await</code> fungsi <code>play()</code> di dalam antrean loading, melainkan menjalankannya sebagai aksi independen (*fire-and-forget* aman) agar antrean tidak macet selama durasi lagu.
           </li>
@@ -814,6 +829,10 @@ scope.tabs.goTo(AppTabs.settings);
 }
 </code></pre>
         <p>Dengan <code>ListenableBuilder(listenable: player, ...)</code>, UI hanya akan merender ulang bagian yang diperlukan saat snapshot ini berubah.</p>
+        <ul>
+          <li><strong>Throttle Posisi (<code>_onPosition</code>)</strong>: <code>just_audio</code> mengirim event posisi ~4–10×/detik. <code>_onPosition</code> kini hanya memanggil <code>_publish</code> saat <strong>detik berubah</strong> (<code>_lastPublishedSecond</code>), bukan setiap event — memangkas rebuild UI hingga ~10×. Posisi internal tetap diperbarui tiap event.</li>
+          <li><strong>Cache Antrean (<code>_compose</code>)</strong>: <code>_compose()</code> menyimpan <code>_cachedQueue</code>/<code>_cachedNativeQueue</code> dan hanya membangun ulang <code>List&lt;PlayerTrack&gt;</code> bila <code>_nativeQueue</code> benar-benar berganti (cek <code>identical</code>), menghindari alokasi ulang seluruh antrean tiap frame.</li>
+        </ul>
       </div>
     </section>
 
@@ -863,7 +882,7 @@ scope.tabs.goTo(AppTabs.settings);
           <tr>
             <td><strong>Koleksi (Library)</strong></td>
             <td><code>screens/library.dart</code></td>
-            <td>Pusat manajemen perpustakaan pengguna: pengelolaan playlist lokal kustom, album & artis tersimpan, lagu favorit offline, serta analitik statistik mendengarkan. Modal penambahan lagu didukung fallback pencarian mandiri.</td>
+            <td>Pusat manajemen perpustakaan pengguna: pengelolaan playlist lokal kustom, album & artis tersimpan, lagu favorit offline, serta analitik statistik mendengarkan. Modal penambahan lagu didukung fallback pencarian mandiri. Rekomendasi (<code>_loadRecommendations</code>) memproses riwayat pencarian <strong>paralel per batch 5</strong> via <code>Future.wait</code> (berhenti di 30 hasil), bukan serial satu-per-satu.</td>
           </tr>
           <tr>
             <td><strong>Pengaturan</strong></td>
@@ -890,6 +909,16 @@ scope.tabs.goTo(AppTabs.settings);
       <div class="callout info">
         <strong>💡 3. Jangan Menaruh String Hex Sembarangan di Widget</strong>
         <p>Gunakan selalu token warna dari <code>Theme.of(context).colorScheme</code> atau extension <code>context.sonora</code> di <code>lib/ui/theme.dart</code>. Ini memastikan aplikasi Anda secara otomatis mendukung tema Terang (*Light Mode*) dan Gelap (*Dark Mode*) tanpa perlu if-else warna manual.</p>
+      </div>
+
+      <div class="callout danger">
+        <strong>⚠️ 4. Jangan Resolusi Seluruh Antrean Sebelum Play</strong>
+        <p>Resolusi stream tiap lagu = manifest + probe jaringan ke CDN. Menunggu <strong>semua</strong> lagu selesai di-resolve sebelum lagu pertama bunyi membuat tombol play terasa "lama banget". Pola benar: resolve + <code>setAudioSource</code> lagu pertama dulu, isi sisanya di latar belakang (<code>_fillRemainingQueue</code>).</p>
+      </div>
+
+      <div class="callout info">
+        <strong>💡 5. Throttle Stream Posisi & Cache Hasil <code>_compose()</code></strong>
+        <p>Jangan <code>notifyListeners()</code> tiap event posisi (4–10×/detik) — cukup saat detik berubah. Dan jangan bangun ulang <code>List&lt;PlayerTrack&gt;</code> tiap <code>_compose()</code>; cache dan hanya rebuild saat <code>_nativeQueue</code> berganti.</p>
       </div>
     </section>
 
